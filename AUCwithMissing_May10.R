@@ -181,7 +181,6 @@ temp.1.exp <- temp.1.exp.stat <- list()         # inner shells
   }
 }
 
-
 ## 3. Evaluation  ########################################################################################
 #3.1 Coverage probability
 
