@@ -16,7 +16,7 @@ CI.base <- function(mu.hat, Var, alpha) {
 }
 AUC <- function(x, y, n.x=length(x), n.y=length(y)) {
   A <- 0; for (i in 1:n.x) { A = A + ( sum(y > x[i]) + sum(y==x[i])/2 ) }
-  return(A = A/(n.x * n.y))
+  return(A = A/ n.x / n.y)
 }
 # Q.stat for HM and its derivatives
 Q.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
