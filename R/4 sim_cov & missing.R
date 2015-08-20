@@ -19,22 +19,22 @@ datagenerator <- function(n,alpha0,alpha1,beta0,beta1,beta2,beta3,sig,gamma0,gam
 
 mu.V = rep(0,5)
 Sigma = matrix(c(1, 0, 0.3, 0.4, -0.4, 0, 1, 0.2, 0.2, 0, 0.3, 0.2, 1, 0.7, -0.5, 0.4, 0.2, .7, 1, -0.2, -0.4, 0, -0.5, -0.2, 1), 5,5)
-phi = 0.3; alpha0 = log(phi/(1-phi))
+phi = 0.5; alpha0 = log(phi/(1-phi))
 alpha1 = rep(1,5)
 beta0 = 0
-beta1 = 0.1
+beta1 = 3
 beta2 = rep(0.1,5)
 beta3 = rep(0.05,5)
 sig = 1
 gamma0 = -1
-gamma1 = -0.2
-gamma2 = rep(-0.1,5)
-gamma3 = rep(-0.05,5)
+gamma1 = -.5
+gamma2 = -.5
+gamma3 = rep(-.5,5)
 
-set.seed(1)
-temp <- datagenerator(100000,alpha0,alpha1,beta0,beta1,beta2,beta3,sig,gamma0,gamma1,gamma2,gamma3,mu.V,Sigma)
+#set.seed(1)
+temp <- datagenerator(10000,alpha0,alpha1,beta0,beta1,beta2,beta3,sig,gamma0,gamma1,gamma2,gamma3,mu.V,Sigma)
 AUC(temp$marker[temp$disease==0], temp$marker[temp$disease==1])
 
 #temp[,c("disease","diseaseR")]
-#table(data.frame(disease=temp[,c("disease")], diseaseR=ifelse(is.na(temp$diseaseR),"NA",temp$disease)))
+table(data.frame(disease=temp[,c("disease")], diseaseR=ifelse(is.na(temp$diseaseR),"NA",temp$disease)))
 

@@ -75,10 +75,9 @@ SeSp <- function(data,
 
 #### 1.2.2 SeSp to AUC function
 SeSp2AUC = function(data) {
-#  Se.ave <- (c(1,data$Se) + c(data$Se,0))/2
-  Se.ave <- c(data$Se,0)
-  Sp.dif <- c(data$Sp,1) - c(0, data$Sp)
-  return(sum(Se.ave*Sp.dif))
+  Se <- c(data$Se,0)
+  d.Sp <- c(data$Sp,1) - c(0, data$Sp)
+  return(sum(Se*d.Sp))
 }
 
 # each direct method
