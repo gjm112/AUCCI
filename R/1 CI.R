@@ -14,10 +14,29 @@ CI.methods = c("HanleyMcNeilWald", "HanleyMcNeilExponential", "HanleyMcNeilScore
 CI.base <- function(mu.hat, Var, alpha) {
   return(mu.hat + c(-1,1) * qnorm(1-alpha/2)*sqrt(Var))
 }
-AUC <- function(x, y, n.x=length(x), n.y=length(y)) {
+AUC.classic <- function(x, y, n.x=length(x), n.y=length(y)) {
   A <- 0; for (i in 1:n.x) { A = A + ( sum(y > x[i]) + sum(y==x[i])/2 ) }
   return(A = A/ n.x / n.y)
 }
+# new AUC function added with much improved efficiency
+AUC <- function(x, y, n.x=length(x), n.y=length(y)) {
+  predictions = c(x,y)
+  labels = c(rep(0,n.x), rep(1,n.y))
+  pred.order = order(predictions, decreasing = TRUE)
+  predictions.sorted = predictions[pred.order]
+  tp = cumsum(labels[pred.order] == 1)
+  fp = cumsum(labels[pred.order] == 0)
+  dups <- rev(duplicated(rev(predictions.sorted)))
+  tp <- c(0, tp[!dups])
+  fp <- c(0, fp[!dups])
+  #cutoffs <- c(Inf, predictions.sorted[!dups])
+  # excerpted until here from <ROCR> prediction function
+  tpr <- tp[-1]/max(tp)
+  d.fp <- fp[-1] - fp[-length(fp)]
+  d.fpr <- d.fp/max(fp)
+  return(sum(tpr*d.fpr))
+}
+
 # Q.stat for HM and its derivatives
 Q.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   Q2 <- Q1 <- 0
