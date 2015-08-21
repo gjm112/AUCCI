@@ -32,9 +32,9 @@ gamma2 = -.5
 gamma3 = rep(-.5,5)
 
 #set.seed(1)
-temp <- datagenerator(10000,alpha0,alpha1,beta0,beta1,beta2,beta3,sig,gamma0,gamma1,gamma2,gamma3,mu.V,Sigma)
-AUC(temp$marker[temp$disease==0], temp$marker[temp$disease==1])
-
+temp <- datagenerator(10000000,alpha0,alpha1,beta0,beta1,beta2,beta3,sig,gamma0,gamma1,gamma2,gamma3,mu.V,Sigma)
+Sys.time(); AUC(temp$marker[temp$disease==0], temp$marker[temp$disease==1])
+Sys.time(); performance(prediction(temp$marker, temp$disease),"auc")@y.values[[1]]
 #temp[,c("disease","diseaseR")]
 table(data.frame(disease=temp[,c("disease")], diseaseR=ifelse(is.na(temp$diseaseR),"NA",temp$disease)))
 
