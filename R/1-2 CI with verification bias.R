@@ -1,11 +1,6 @@
 ### AUCCI Part I. CI functions
 ## 1-2. CI functions with verification bias
 
-####### modify SeSp as a function of cutoff "vector"!!!
-####### what is the estimate of pi? in IPW and SP methods
-
-cutoff=seq(min(data[,names[[2]]]),max(data[,names[[2]]]),length.out=1000)
-
            
 ## 1.2.1 SeSp function           
 SeSp <- function(data, 
