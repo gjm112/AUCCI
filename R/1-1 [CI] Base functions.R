@@ -8,9 +8,9 @@ library(sn)         # for Owen's T-function in Double Gaussian Method (0.2.15)
 # CI methods :    ref to 1.CI test(temp), 2.simulation, 3.evaluation
 CI.methods = c("HanleyMcNeilWald", "HanleyMcNeilExponential", "HanleyMcNeilScore", 
                "NewcombeExponential", "NewcombeScore", "CortesMohri", "ReiserGuttman", 
-               "ClopperPearson", "Bamber", "WilsonScore",
-               "HalperinMee", "DoubleBeta", "DoubleGaussian",
-               "MannWhitney", "MannWhitneyLT", "DeLong")
+               "Bamber", "HalperinMee", "DoubleBeta", "DoubleGaussian",
+               "MannWhitney", "DeLong", 
+               "ClopperPearson","WilsonScore")
 ########################################################################################
 
 ## 1.1.1 Basic internal functions ######################################################
@@ -41,6 +41,21 @@ AUC <- function(x, y, n.x=length(x), n.y=length(y)) {
   return(sum(tpr*d.fpr))
 }
 
+# data converter: from dataframe to x, y vectors
+data2xy <- function(data, disease="disease", marker="marker") {
+  x = data[data[,disease]==0, marker]
+  y = data[data[,disease]==1, marker]
+  return(list(x=x,y=y))
+}
+
+# logit, expit
+logit <- function(data, LT=TRUE) {
+  if (LT) {return(log(data/(1-data)))} else {return(data)}
+}
+expit <- function(data, LT=TRUE) {
+  if (LT) {return((1+exp(data)^-1)^-1)} else {return(data)}
+}
+
 ## 1.1.2 variance estimators ###########################################################
 # Q.stat for HM and its derivatives
 Q.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
@@ -49,21 +64,25 @@ Q.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   for (j in 1:n.y) {Q2 = Q2 + ( sum(y[j] > x) + sum(y[j]==x)/2 )^2}; Q2 = Q2 /(n.x^2 * n.y)
   return(data.frame(Q1 = Q1, Q2 = Q2))
 }
-V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1)) {
+V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1), LT=FALSE) {
   # default: HME method
-  return((AUC * (1-AUC) + (n.y -1)*(Q1 - AUC^2) + (n.x-1)*(Q2 - AUC^2))/(n.x*n.y) )
+  if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
+  return((AUC * (1-AUC) + (n.y -1)*(Q1 - AUC^2) + (n.x-1)*(Q2 - AUC^2)) /(n.x*n.y) /div.LT )
 }
-HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha) {
-  AUC + c(+1,-1)*qnorm(1-alpha/2) * sqrt(V.HM(AUC, n.x, n.y)) - AUC.hat
+HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE) {
+  if (is.na(MI[1])) {B=0; m=1} else {m = length(MI); B = var(MI)}
+  logit(AUC,LT=LT) + c(+1,-1)*qnorm(1-alpha/2) * sqrt(V.HM(AUC, n.x, n.y, LT=LT)+B*(1+1/m)) - logit(AUC.hat,LT=LT)
 }
-V.NC <- function(AUC, n.x, n.y) {
+V.NC <- function(AUC, n.x, n.y, LT=FALSE) {
   N = (n.x+n.y)/2
-  return( AUC*(1-AUC)/(n.x*n.y) * ( (2*N-1) - (3*N-3) / ((2-AUC)*(AUC+1)) ) )
+  if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
+  return( AUC*(1-AUC)/(n.x*n.y) * ( (2*N-1) - (3*N-3) / ((2-AUC)*(AUC+1)) )/div.LT )
 }
-NC.equation <- function(AUC, AUC.hat, n.x, n.y, alpha) {
-  AUC + c(+1,-1)*qnorm(1-alpha/2) * sqrt(V.NC(AUC, n.x, n.y)) - AUC.hat   
+NC.equation <- function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE) {
+  if (is.na(MI[1])) {B=0; m=1} else {m = length(MI); B = var(MI)} 
+  logit(AUC,LT=LT) + c(+1,-1)*qnorm(1-alpha/2) * sqrt(V.NC(AUC, n.x, n.y, LT=LT)+B*(1+1/m)) - logit(AUC.hat,LT=LT)
 }
-V.CM <- function(AUC, n.x, n.y){
+V.CM <- function(AUC, n.x, n.y, LT=FALSE){
   z1 = function (w, n.x, n.y, k) {1-0.5*(w/n.x+(k-w)/n.y)}
   z2 = function (w, n.x, n.y, k) 
     (n.y*w^2+n.x*(k-w)^2+n.y*(n.y+1)*w+n.x*(n.x+1)*(k-w)-2*w*(k-w)*(n.y+n.x+1))/(12*n.y^2*n.x^2)
@@ -76,9 +95,20 @@ V.CM <- function(AUC, n.x, n.y){
     F2 = F2 + F.base(w, n.x, n.y, k)*z1(w, n.x, n.y, k)
     F3 = F3 + F.base(w, n.x, n.y, k)*z2(w, n.x, n.y, k)
   }
-  return(V = (F1/F.den - F2^2/F.den^2 + F3/F.den))
+  if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
+  return(V = (F1/F.den - F2^2/F.den^2 + F3/F.den)/div.LT)
 }
-V.Bm <- function(x, y, n.x=length(x), n.y=length(y), AUC.hat=AUC(x,y,n.x,n.y)){
+probit.RG <- function(x, y, n.x=length(x), n.y=length(y)){
+  mu.x = mean(x); mu.y = mean(y)
+  sig.x = sd(x);  sig.y = sd(y); s2 = sig.x^2 + sig.y^2
+  d = (mu.y-mu.x)/sqrt(s2)
+  f = s2^2/((sig.x^4/(n.x-1))+(sig.y^4/(n.y-1)))
+  M = s2/((sig.x^2/n.x)+(sig.y^2/n.y))
+  V = 1/M + d^2/(2*f)
+  return(data.frame(delta=d, V=V))
+}
+
+V.Bm <- function(x, y, n.x=length(x), n.y=length(y), AUC.hat=AUC(x,y,n.x,n.y), LT=FALSE){
   b.yyx <- b.xxy <- p.xy <- 0
   for (i in 1:n.x) {b.yyx = b.yyx + sum(y < x[i])^2 + sum(x[i] < y)^2 -2*sum(y < x[i])*sum(x[i] < y) }
   b.yyx = b.yyx/(n.x*n.y^2)
@@ -86,7 +116,8 @@ V.Bm <- function(x, y, n.x=length(x), n.y=length(y), AUC.hat=AUC(x,y,n.x,n.y)){
   b.xxy = b.xxy/(n.y*n.x^2)
   for (i in 1:n.x) {  p.xy = p.xy + sum(y != x[i] ) }
   p.xy = p.xy /(n.x*n.y)
-  return(1/(4*(n.y-1)*(n.x-1))*(p.xy + (n.y -1)*b.xxy + (n.x -1)*b.yyx - 4*(n.y + n.x -1)*(AUC.hat -0.5)^2))
+  if (LT) {div.LT = (AUC.hat*(1-AUC.hat))^2} else {div.LT=1}
+  return(1/(4*(n.y-1)*(n.x-1))*(p.xy + (n.y -1)*b.xxy + (n.x -1)*b.yyx - 4*(n.y + n.x -1)*(AUC.hat -0.5)^2)/div.LT)
 }
 # p.stat for Halperin Mee method
 p.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
@@ -113,42 +144,48 @@ Halperin.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   rho.hat = (p-AUC.hat^2)/(AUC.hat-AUC.hat^2)
   N.J.hat = n.x*n.y/(((n.x-1)*rho.hat$p1 +1)/(1-1/n.y) + ((n.y-1)*rho.hat$p2 + 1 )/(1-1/n.x) )
   return(data.frame(p1=p$p1, p2=p$p2, AUC.hat=AUC.hat, N.J.hat=N.J.hat))
-}  
-Halperin.equation <- function(AUC, AUC.hat, N.J.hat, alpha){
-  AUC + c(+1,-1)*qnorm(1-alpha/2) * sqrt(AUC*(1-AUC)/N.J.hat) - AUC.hat
 }
-Halperin <- function(x, y, n.x=length(x), n.y=length(y), alpha) {
-  Halperin.stat = Halperin.stat(x, y, n.x, n.y)
-  AUC.hat = Halperin.stat$AUC.hat
-  N.J.hat = Halperin.stat$N.J.hat
-  multiroot(Halperin.equation, c(0.01, 0.99), AUC.hat=AUC.hat, N.J.hat=N.J.hat, alpha=alpha)$root 
+V.Halperin <- function(x, y, n.x=length(x), n.y=length(y), AUC=AUC(x,y,n.x,n.y), LT=FALSE) {
+  N.J.hat = Halperin.stat(x,y,n.x,n.y)$N.J.hat
+  V = AUC*(1-AUC) / N.J.hat
+  if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
+  return( V/div.LT )
 }
-V.DB <- function(alp, n.x, n.y) {
+Halperin.equation <- function(AUC, AUC.hat, x, y, n.x, n.y, alpha, MI=NA, LT=FALSE){
+  if (is.na(MI[1])) {B=0; m=1} else {m = length(MI); B = var(MI)}
+  logit(AUC,LT=LT) + c(+1,-1)*qnorm(1-alpha/2) * sqrt(V.Halperin(x, y, n.x, n.y, AUC, LT=LT)+B*(1+1/m)) - logit(AUC.hat,LT=LT)
+}
+V.DB <- function(alp, n.x, n.y, LT=FALSE) {
   R1 = gamma(alp + 1)^2 / gamma(2*alp + 1)
   R2 = gamma(2*alp +1)*gamma(alp +1)/gamma(3*alp+1)
   theta = 1 - R1
   Q = 1 - 2*R1 + R2
-  V = (theta*(1-theta) + (n.x+n.y-2)*(Q-theta^2))/n.x/n.y
+  if (LT) {div.LT = (theta*(1-theta))^2} else {div.LT=1}
+  V = (theta*(1-theta) + (n.x+n.y-2)*(Q-theta^2))/n.x/n.y/div.LT
 }
-DB.equation <- function(alp, AUC.hat, n.x, n.y, alpha) {
+DB.equation <- function(alp, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE){
+  if (is.na(MI[1])) {B=0; m=1} else {m = length(MI); B = var(MI)}
   AUC = 1 - gamma(alp + 1)^2 / gamma(2*alp + 1)
-  return(AUC + c(+1,-1)*qnorm(1-alpha/2) * sqrt(V.DB(alp, n.x, n.y)) - AUC.hat)
+  return(logit(AUC,LT=LT) + c(+1,-1)*qnorm(1-alpha/2) * sqrt(V.DB(alp, n.x, n.y, LT=LT)+B*(1+1/m)) - logit(AUC.hat,LT=LT))
 }
-DB <- function(AUC.hat, n.x, n.y, alpha) {
-  alp <- multiroot(DB.equation, c(1,3), AUC.hat=AUC.hat, n.x=n.x, n.y=n.y, alpha=alpha)$root
+DB <- function(AUC.hat, n.x, n.y, alpha,...) {
+  alp <- multiroot(DB.equation, c(1,3), AUC.hat=AUC.hat, n.x=n.x, n.y=n.y, alpha=alpha,...)$root
   return(1 - gamma(alp + 1)^2 / gamma(2*alp + 1))
 }
-V.DG <- function(delta, n.x, n.y) {
+
+V.DG <- function(delta, n.x, n.y, LT=FALSE){
   theta = pnorm(delta/sqrt(2))
   Owen = T.Owen(delta/sqrt(2), 1/sqrt(3))
-  return(V = ((n.x + n.y - 1)*theta*(1-theta) - 2*(n.x + n.y -2) * Owen ) / (n.x * n.y))
+  if (LT) {div.LT = (theta*(1-theta))^2} else {div.LT=1}
+  return(V = ((n.x + n.y - 1)*theta*(1-theta) - 2*(n.x + n.y -2) * Owen ) / (n.x * n.y) /div.LT)
 }
-DG.equation <- function(delta, AUC.hat, n.x, n.y, alpha) {
+DG.equation <- function(delta, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE) {
+  if (is.na(MI[1])) {B=0; m=1} else {m = length(MI); B = var(MI)}
   AUC = pnorm(delta/sqrt(2))
-  return(AUC + c(+1,-1)*qnorm(1-alpha/2) * sqrt(V.DG(delta, n.x, n.y)) - AUC.hat)
+  return(logit(AUC,LT=LT) + c(+1,-1)*qnorm(1-alpha/2) * sqrt(V.DG(delta, n.x, n.y, LT=LT)+B*(1+1/m)) - logit(AUC.hat,LT=LT))
 }
-DG <- function(AUC.hat, n.x, n.y, alpha) {
-  delta <- multiroot(DG.equation, c(1, 3), AUC.hat=AUC.hat, n.x=n.x, n.y=n.y, alpha=alpha)$root
+DG <- function(AUC.hat, n.x, n.y, alpha,...) {
+  delta <- multiroot(DG.equation, c(0.5, 0.9), AUC.hat=AUC.hat, n.x=n.x, n.y=n.y, alpha=alpha,...)$root
   return(pnorm(delta/sqrt(2)))
 }
 S.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
