@@ -35,10 +35,10 @@ sig = 1
 # To estimate parameters that satisfy specific phi and theta,
 # refer to 2-2-1 parameterfinder.R(beta1) and 2-2-2 alphafinder.R(alpha0).
 param1 = list(alphabet = data.frame(phi = rep(c(.5,.7), each=3), 
-                                    theta = c(0.7999914248, 0.89999851, 0.950002331, 0.800002545, .9, .95), 
-                                    theta.SE =c(5.80868E-06,4.09076E-06,2.76121E-06,7.79383E-06, 0, 0) ,
+                                    theta = c(0.7999914248, 0.89999851, 0.950002331, 0.800002545, 0.899999218, .95), 
+                                    theta.SE =c(5.80868E-06,4.09076E-06,2.76121E-06,7.79383E-06, 5.34159E-06, 0) ,
                                     alpha0 = rep(c(0,1.6111), each=3), 
-                                    beta1=c(0.8089, 1.4486, 1.97674,.8319,1.4729,2.0024)), 
+                                    beta1=c(0.8089, 1.4486, 1.97674,.8319,1.47286,2.0024)), 
               gamma = data.frame(q1 = c(.8, .95), q2 = c(.9, .95), q3=q1, q4=q2, gamma = c(.8, .95)))
 # alpha0 = 0 for phi==0, alpha0 = 1.6111 for phi==.7
 # q3= q1, q4= q2: MAR settings
@@ -50,7 +50,7 @@ alpha = c(0.1, 0.05, 0.01)
 CI.methods = c("HanleyMcNeilWald", "HanleyMcNeilExponential", "HanleyMcNeilScore", 
                "NewcombeExponential", "NewcombeScore", "CortesMohri", "ReiserGuttman", 
                "Bamber", "HalperinMee", "DoubleBeta", "DoubleGaussian",
-               "MannWhitney", "MannWhitneyLT", "DeLong", 
+               "MannWhitney", "DeLong", 
                "ClopperPearson","WilsonScore")
 
 
@@ -122,7 +122,12 @@ CI.methods = c("HanleyMcNeilWald", "HanleyMcNeilExponential", "HanleyMcNeilScore
     temp.d1[[i]] <- temp.d2
   }
   sim.data = temp.d1
+  rm(temp.d1)
 }
+
+## Optional: saving the datafile  ########################################################
+saveRDS(sim.data, "sim_data_0927.rds")
+sim.data.0927 <- readRDS("sim_data_0927.rds")
 
 ## 2.3.2.2 Simulation by part (Evaluation only)  #########################################
 {
@@ -150,3 +155,4 @@ sim.data[[4]][[1]][[4]]
 head(sim.data[[4]][[1]][[1]][[5]])
 head(sim.data[[4]][[1]][[3]])
 
+t(sim.data[[4]][[2]][[4]][[1]])[,1]

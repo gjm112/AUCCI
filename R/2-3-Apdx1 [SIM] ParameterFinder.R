@@ -85,6 +85,7 @@ param.finder = function(param = "beta1", start, target, digit = 1, target.digit=
     param.val = param.val0
     round2 <- data.frame(param = param.val+(1:7-4)*10^(-target.digit), theta.hat = NA)
     n.sample = min(max(round((stdev/tolerance/10)^2,-2),20), round2.nsample)
+    tht = rep(NA,n.sample)
     print(paste(n.sample, "samples(X10mil) for the best estimate +3/-3 ticks "))
     
     for (k in 1:7){
@@ -142,7 +143,7 @@ param.finder = function(param = "beta1", start, target, digit = 1, target.digit=
       tht[j] <- AUC(temp$marker[temp$disease==0], temp$marker[temp$disease==1])
       if (j %% floor(n.sample/20) == 0) {print(mean(tht, na.rm=TRUE))}
     }
-    print(tht.mean <- mean(tht)); print(range(tht)); print(tht)
+    print(tht); print(tht.mean <- mean(tht)); print(range(tht))
     stdev = sd(tht)
 
     # storing the last values to result
@@ -164,4 +165,4 @@ param.finder = function(param = "beta1", start, target, digit = 1, target.digit=
 # th.90 = param.finder(start=1.6, target=0.9, digit=1)
 # th.80b = param.finder(start=0.8088, target=0.8, digit=4, round2.nsample=20, final.nsample=40)
 param.finder(start=1.473, target=0.9, digit=3,round=1) #alpha0=1.6111
-
+th.95.p70=param.finder(start=1.976, target=0.95, digit=4,round=3)
