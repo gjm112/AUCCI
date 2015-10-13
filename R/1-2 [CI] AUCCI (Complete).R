@@ -83,7 +83,7 @@ AUCCI <- function(data, method, disease="disease", marker="marker", alpha=0.05, 
     }
   }
   
-  else if (method == "DoubleBeta") {
+  else if (method == "DoubleBeta") {     #variance(or alp) has an unstable solution
     CI = DB(A, n.x, n.y, alpha, LT=LT)
     CI.LT = logit(CI, LT=LT)
     if (variance) {
@@ -92,7 +92,7 @@ AUCCI <- function(data, method, disease="disease", marker="marker", alpha=0.05, 
     }
   }
   
-  else if (method == "DoubleGaussian") {
+  else if (method == "DoubleGaussian") {  #variance(or alp) has an unstable solution
     CI = DG(A, n.x, n.y, alpha, LT=LT)
     CI.LT = logit(CI, LT=LT)
     if (variance) {
@@ -102,15 +102,16 @@ AUCCI <- function(data, method, disease="disease", marker="marker", alpha=0.05, 
   }
   
   else if (method == "MannWhitney") {
-    V = S.stat(x, y, n.x, n.y)^2 * n / (n.x * n.y);  V.LT = V/ifelse(LT,(A*(1-A))^2,1)
-    CI = CI.base(A.LT,V.LT,alpha)
+    V.LT = S.stat(x, y, n.x, n.y, A, LT=LT)^2 * n / (n.x * n.y)
+    CI.LT = CI.base(A.LT,V.LT,alpha)
   }
   
   else if (method == "DeLong") {
-    V = V.DeLong(x, y, n.x, n.y, A);  V.LT = V/ifelse(LT,(A*(1-A))^2,1)
-    CI = CI.base(A.LT,V.LT,alpha)
+    V.LT = V.DeLong(x, y, n.x, n.y, A, LT=LT)
+    CI.LT = CI.base(A.LT,V.LT,alpha)
   }  
   
+  ##### WilsonScore and ClopperPearson methods are excluded from this study ##########
   else if (method == "WilsonScore") {
     z.a2 = qnorm(1-alpha/2)
     CI = (2*n*A + z.a2^2 +cc*c(-1,1) +c(-1,1)* z.a2* sqrt(z.a2^2 + cc*c(-2,2) - 1/n*cc + 4*A*(n*(1-A) +1*cc)))/(2*(n+z.a2^2))
@@ -124,6 +125,7 @@ AUCCI <- function(data, method, disease="disease", marker="marker", alpha=0.05, 
     ##  V = ??
     CI = c( (k*f1)/(n-k+1+k*f1), ((k+1)*f2)/(n-k+(k+1)*f2) )
   }
+  ##### WilsonScore and ClopperPearson methods are excluded from this study ##########
   
   result = list(AUC.hat = A, CI = expit(CI.LT,LT=LT));  if (variance) {result$V.hat = V.LT}
   return(result)
