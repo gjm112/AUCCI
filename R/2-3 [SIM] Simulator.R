@@ -47,13 +47,11 @@ param1 = list(alphabet = data.frame(phi = rep(c(.5,.7), each=3),
 n = c(200, 100, 50); n.max = max(n)
 n.sim = 10000    # To be changed to 10,000
 alpha = c(0.1, 0.05, 0.01)
+
+# CI.methods from 1-1 [CI] Base functions.R
 CI.methods = c("HanleyMcNeilWald", "HanleyMcNeilExponential", "HanleyMcNeilScore", 
                "NewcombeExponential", "NewcombeScore", "CortesMohri", "ReiserGuttman", 
-               "Bamber", "HalperinMee", "DoubleBeta", "DoubleGaussian",
-               "MannWhitney", "DeLong", 
-               "ClopperPearson","WilsonScore")
-
-
+               "Bamber", "HalperinMee", "DoubleBeta", "DoubleGaussian", "DeLong")
 
 ## 2.3.2 Simulator #######################################################################
 
