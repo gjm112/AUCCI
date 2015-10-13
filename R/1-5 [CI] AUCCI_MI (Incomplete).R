@@ -23,7 +23,7 @@ alpha = .05
 
 AUCCI.MI = function(data, MI.function, MI.method, m, CI.method, alpha=.05, LT=FALSE, variance=FALSE, MI.thetas=FALSE, ...) {
   # note: predictorMatrix(for mice) should exclude disease
-  # LT: logit transformation
+  # LT: logit transformation      # not available for RG
   # A. imputation stage
   # returning variance when logit=T is var(logit(theta))
   if (identical(MI.function, mice)) {
@@ -47,7 +47,7 @@ AUCCI.MI = function(data, MI.function, MI.method, m, CI.method, alpha=.05, LT=FA
   mi.stat$div.LT = ifelse(LT,(mi.stat$theta[i]*(1-mi.stat$theta[i]))^2,1)
   mean.MI = mean(mi.stat$theta)
   mean.MI.LT = mean(mi.stat$theta.LT)
-  var.B.LT = var(mi.stat$theta.LT)
+  var.B.LT = var(mi.stat$theta.LT)    # => Erase when not necessary any more after using funtion Rubin
   
   # C. CI stage
   # Categorizing CI types
@@ -62,10 +62,10 @@ AUCCI.MI = function(data, MI.function, MI.method, m, CI.method, alpha=.05, LT=FA
     for (i in 1:m) {
       mi.stat$var.LT[i] = AUCCI(data.comp[[i]], method=CI.method, disease="diseaseR", alpha=alpha, variance = TRUE, LT=LT)$V.hat
     }
-    var.W.LT = mean(mi.stat$var.LT)
-    var.MI.LT = var.W.LT + (1 + 1/m)*var.B.LT
-    
-    CI.LT = CI.base(mean.MI.LT, var.MI.LT, alpha)    # logit scale (will back-transform in the end)
+    Rubin = Rubin(W=mean(mi.stat$var.LT), MI=mi.stat$theta.LT, alpha=alpha, print.nu = TRUE)
+    var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
+    nu.LT = Rubin$nu             # degree of freedom for MI
+    CI.LT = CI.base(mean.MI.LT, var.MI.LT, alpha, qt, df=nu.LT)    # logit scale (will back-transform in the end)
   }
   if (CI.method %in% CI.Score) {
     if (CI.method == "HanleyMcNeilScore") {
@@ -81,46 +81,39 @@ AUCCI.MI = function(data, MI.function, MI.method, m, CI.method, alpha=.05, LT=FA
       for (i in 1:m) {
         mi.stat$var.LT[i] = AUCCI(data.comp[[i]], method=CI.method, disease="diseaseR", alpha=alpha, variance = TRUE, LT=LT)$V.hat
       }
-      var.W.LT = mean(mi.stat$var.LT)
-      var.MI.LT = var.W.LT + (1 + 1/m)*var.B.LT
+      Rubin = Rubin(W=mean(mi.stat$var.LT), MI=mi.stat$theta.LT, alpha=alpha)
+      var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
     }
   }
   if (CI.method %in% CI.root) {
     if (CI.method == "DoubleBeta") {
       CI = DB(AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT)
+      CI.LT = logit(CI, LT=LT)
       if (variance) {
-        MI.DB = data.frame(alp = rep(NA, m), var.LT = rep(NA, m))
+        MI.DB = data.frame(alp = rep(NA, m), var = rep(NA, m))
         for (i in 1:m) {
-          MI.DB$alp[i] = multiroot(DB.equation, c(1,3), AUC.hat=mi.stat$theta[i], n.x=n.x, n.y=n.y, alpha=1,LT=LT)$root[1]
+          MI.DB$alp[i] = multiroot(DB.equation, c(1,3), AUC.hat=mi.stat$theta[i], n.x=n.x, n.y=n.y, alpha=1 ,LT=LT)$root[1]
           MI.DB$var.LT[i] = V.DB(MI.DB$alp[i], n.x, n.y, LT=LT)
         }
-        var.W.LT = mean(MI.DB$var.LT)
-        var.MI.LT = var.W.LT + (1 + 1/m)*var.B.LT
+        Rubin = Rubin(W=mean(MI.DB$var.LT), MI=mi.stat$theta.LT, alpha=alpha)
+        var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
       }
     }
     else if (CI.method == "DoubleGaussian") {
       CI = DG(AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT)
+      CI.LT = logit(CI, LT=LT)
       if (variance) {
         MI.DG = data.frame(delta = rep(NA, m), var.LT = rep(NA, m))
         for (i in 1:m) {
           MI.DG$delta[i] = multiroot(DG.equation, c(1,3), AUC.hat=mi.stat$theta[i], n.x=n.x, n.y=n.y, alpha=1,LT=LT)$root[1]
           MI.DG$var.LT[i] = V.DG(MI.DG$delta[i], n.x, n.y, LT=LT)
         }
-        var.W.LT = mean(MI.DG$var.LT)
-        var.MI.LT = var.W.LT + (1 + 1/m)*var.B.LT
+        Rubin = Rubin(W=mean(mi.stat$var.LT), MI=mi.stat$theta.LT, alpha=alpha)
+        var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
       }
-    }
-      
-    CI.LT = logit(CI,LT=LT)
-    if (variance) {
-      for (i in 1:m) {
-        mi.stat$var.LT[i] = AUCCI(data.comp[[i]], method=CI.method, disease="diseaseR", alpha=alpha, variance = TRUE, LT=LT)$V.hat
-      }
-      var.W.LT = mean(mi.stat$var.LT)
-      var.MI.LT = var.W.LT + (1 + 1/m)*var.B.LT
     }
   }  
-  if (CI.method == "ReiserGuttman") {
+  if (CI.method == "ReiserGuttman") {         # LT, variance not available
     MI.RG = data.frame(delta = rep(NA, m), var = rep(NA, m))
     for (i in 1:m) {
       temp = data2xy(data.comp[[i]],disease="diseaseR", marker="marker")
@@ -129,17 +122,18 @@ AUCCI.MI = function(data, MI.function, MI.method, m, CI.method, alpha=.05, LT=FA
       MI.RG$var[i] = probit.RG(x, y)$V
     }
     delta.mean = mean(MI.RG$delta)
-    mean.MI = pnorm(delta.mean); mean.MI.LT = logit(mean.MI, LT=LT)
-    var.W = mean(MI.RG$var)
-    var.B = var(MI.RG$delta)
-    var.MI = var.W + (1 + 1/m)*var.B
-    d.CI = delta.mean + c(-1,1)*qnorm(1-alpha/2)*sqrt(var.MI)
+    Rubin = Rubin(W=mean(MI.RG$var), MI=MI.RG$delta, alpha=alpha)
+    var.MI = Rubin$v.final         # W + (1/m)*B for MI
+    z.val = Rubin$z.val
+    d.CI = delta.mean + c(-1,1)*z.val*sqrt(var.MI)
     CI = pnorm(d.CI)
     CI.LT = logit(CI, LT=LT) # logit transformation not available for RG (only for presentation purpose)
     V.MI.LT = NA                # variance not available for RG(The V above is variance in probit scale)
+    mean.MI=pnorm(delta.mean)
+    var.MI.LT = NA
   }
   
-  result = list(AUC.hat = expit(mean.MI.LT,LT=LT), CI = expit(CI.LT,LT=LT));  if (variance) {result$V.hat = var.MI.LT}; if (MI.thetas) {result$theta.MI = mi.stat$theta; result$theta.LT = mi.stat$theta.LT }
+  result = list(AUC.hat = mean.MI, CI = CI);  if (variance) {result$V.hat = var.MI.LT}; if (MI.thetas) {result$theta.MI = mi.stat$theta; result$theta.LT = mi.stat$theta.LT }
   return(result)
 }
 
