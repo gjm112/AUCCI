@@ -19,7 +19,7 @@ B.hat = var(p.hat.i)
 T.hat = W.hat + (m1+1)/m1*B.hat
 mean(temp2$disease)              #p.hat(comp)
 mean(p.hat.i)
-W.hat; B.hat; T.hat
+W.hat; B.hat; T.hat; print(r<-(1+m1^-1)*B.hat/(W.hat))
 
 # Depending on phi, W varies, and B also varies!!
 # for phi near 0.5, W and B are both high
