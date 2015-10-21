@@ -6,12 +6,22 @@ library(rootSolve)  # for Newton-Raphson Method (0.2.4)
 library(sn)         # for Owen's T-function in Double Gaussian Method (0.2.15)
 
 # CI methods :    ref to 2-3.[SIM] Simulator, 3.evaluation
-CI.methods = c("HanleyMcNeilWald", "HanleyMcNeilExponential", "HanleyMcNeilScore", 
-               "NewcombeExponential", "NewcombeScore", "CortesMohri", "ReiserGuttman", 
-               "Bamber", "HalperinMee", "DoubleBeta", "DoubleGaussian", "DeLong")
+CI.methods = c("Bm", "HM1", "HM2", "NS1", "NW", "NS2", "Mee", "DL", "RG", "CM", "DB", "DG")
+### Descriptions
+# Bm : Bamber
+# HM1 : Hanley-McNeil 1 (Wald, nonparametric var)
+# HM2 : Hanley-McNeil 2 (Wald, parametric var:exponential)
+# NS1 : Newcombe Score1 (Score + HM2)
+# NW : Newcombe Wald (HM2 + balanced design)
+# NS2 : Newcombe Score 2 (NS1 + balanced design)
+# Mee : Mee (Score)
+# DL : DeLong (Wald)
+# RG : Reiser-Guttman (Parametric: Gaussian)
+# DB : Double beta (Parametric: double beta)
+# DG : Double Gaussian (Parametric: double Gaussian)
+# CM : Cortes-Mohri (Wald, Combinatoric variance)
 
-###               "ClopperPearson","WilsonScore" => excluded from this study: not AUC specific
-###               "MannWhitney"                   => excluded: seems identical to DeLong
+###               "CP","WS" => excluded from this study: not AUC specific
 ########################################################################################
 
 ## 1.1.1 Basic internal functions ######################################################
@@ -86,46 +96,50 @@ Q.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   for (j in 1:n.y) {Q2 = Q2 + ( sum(y[j] > x) + sum(y[j]==x)/2 )^2}; Q2 = Q2 /(n.x^2 * n.y)
   return(data.frame(Q1 = Q1, Q2 = Q2))
 }
-V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1), LT=FALSE) {
+V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1), LT=FALSE, sample.var=TRUE) {
   # default: HME method
   if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
-  return((AUC * (1-AUC) + (n.y -1)*(Q1 - AUC^2) + (n.x-1)*(Q2 - AUC^2)) /(n.x*n.y) /div.LT )
+  nxny = ifelse(sample.var, (n.x-1)*(n.y-1), n.x*n.y)  # sample.var: dividing by (nx-1)(ny-1) is unbiased
+  return((AUC * (1-AUC) + (n.y -1)*(Q1 - AUC^2) + (n.x-1)*(Q2 - AUC^2)) /nxny /div.LT )
 }
+
+### for score method it should be populatoin variance not sample variance (sample.var=FALSE).
 ###1 ################## Formula 1: fixed B.hat
-HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE) {
-  W = V.HM(AUC, n.x, n.y, LT=LT)
+HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=FALSE) {
+  W = V.HM(AUC, n.x, n.y, LT=LT, sample.var=sample.var)
   Rubin = Rubin(W=W, MI=MI, alpha=alpha)
   V = Rubin$v.final         # W + (1/m)*B for MI
   z.val = Rubin$z.val       # t value for MI
   return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
 }
 ###2 ################## Formula 2: fixed r.hat
-HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE) {
-  W = V.HM(AUC, n.x, n.y, LT=LT)
-  W.hat = V.HM(AUC.hat, n.x, n.y, LT=LT)
+HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=FALSE) {
+  W = V.HM(AUC, n.x, n.y, LT=LT, sample.var=sample.var)
+  W.hat = V.HM(AUC.hat, n.x, n.y, LT=LT, sample.var=sample.var)
   Rubin = Rubin(W=W.hat, MI=MI, alpha=alpha, print.r=TRUE)
   r = Rubin$r
   z.val = Rubin$z.val       # nu is fixed (since r is fixed)
   return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(W*(1+r)) - logit(AUC.hat,LT=LT))
 }
 
-V.NC <- function(AUC, n.x, n.y, LT=FALSE) {
+V.NC <- function(AUC, n.x, n.y, LT=FALSE, sample.var=TRUE) {
   N = (n.x+n.y)/2
+  nxny = ifelse(sample.var, (n.x-1)*(n.y-1), n.x*n.y)  # sample.var: dividing by (nx-1)(ny-1) is unbiased
   if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
-  return( AUC*(1-AUC)/(n.x*n.y) * ( (2*N-1) - (3*N-3) / ((2-AUC)*(AUC+1)) )/div.LT )
+  return( AUC*(1-AUC)/nxny * ( (2*N-1) - (3*N-3) / ((2-AUC)*(AUC+1)) )/div.LT )
 }
-NC.equation <- function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE) {
-  W = V.NC(AUC, n.x, n.y, LT=LT)
+NC.equation <- function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=TRUE) {
+  W = V.NC(AUC, n.x, n.y, LT=LT, sample.var=sample.var)
   Rubin = Rubin(W=W, MI=MI, alpha=alpha)
   V = Rubin$v.final         # W + (1/m)*B for MI
   z.val = Rubin$z.val       # t value for MI
   return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
 }
 V.CM <- function(AUC, n.x, n.y, LT=FALSE){
-  z1 = function (w, n.x, n.y, k) {1-0.5*(w/n.x+(k-w)/n.y)}
+  z1 = function (w, n.x, n.y, k) {1-0.5*(w/n.y+(k-w)/n.x)}
   z2 = function (w, n.x, n.y, k) 
-    (n.y*w^2+n.x*(k-w)^2+n.y*(n.y+1)*w+n.x*(n.x+1)*(k-w)-2*w*(k-w)*(n.y+n.x+1))/(12*n.y^2*n.x^2)
-  F.base <- function (w, n.x, n.y, k) {choose(n.y-k+2*w,w)*choose(n.x+k-2*w,k-w)}
+    (n.x*w^2+n.y*(k-w)^2+n.x*(n.x+1)*w+n.y*(n.y+1)*(k-w)-2*w*(k-w)*(n.x+n.y+1))/(12*n.x^2*n.y^2)
+  F.base <- function (w, n.x, n.y, k) {choose(n.x-k+2*w,w)*choose(n.y+k-2*w,k-w)}
   k=round((n.x+n.y)*(1-AUC))
   F1=F2=F3=F.den=0
   for (w in 0:k){
@@ -147,7 +161,7 @@ probit.RG <- function(x, y, n.x=length(x), n.y=length(y)){
   return(data.frame(delta=d, V=V))
 }
 
-V.Bm <- function(x, y, n.x=length(x), n.y=length(y), AUC.hat=AUC(x,y,n.x,n.y), LT=FALSE){
+V.Bm <- function(x, y, n.x=length(x), n.y=length(y), AUC.hat=AUC(x,y,n.x,n.y), LT=FALSE, sample.var=TRUE){
   b.yyx <- b.xxy <- p.xy <- 0
   for (i in 1:n.x) {b.yyx = b.yyx + sum(y < x[i])^2 + sum(x[i] < y)^2 -2*sum(y < x[i])*sum(x[i] < y) }
   b.yyx = b.yyx/(n.x*n.y^2)
@@ -155,8 +169,9 @@ V.Bm <- function(x, y, n.x=length(x), n.y=length(y), AUC.hat=AUC(x,y,n.x,n.y), L
   b.xxy = b.xxy/(n.y*n.x^2)
   for (i in 1:n.x) {  p.xy = p.xy + sum(y != x[i] ) }
   p.xy = p.xy /(n.x*n.y)
+  nxny = ifelse(sample.var, (n.x-1)*(n.y-1), n.x*n.y)  # sample.var: dividing by (nx-1)(ny-1) is unbiased
   if (LT) {div.LT = (AUC.hat*(1-AUC.hat))^2} else {div.LT=1}
-  return(1/(4*(n.y-1)*(n.x-1))*(p.xy + (n.y -1)*b.xxy + (n.x -1)*b.yyx - 4*(n.y + n.x -1)*(AUC.hat -0.5)^2)/div.LT)
+  return(1/(4*nxny)*(p.xy + (n.y -1)*b.xxy + (n.x -1)*b.yyx - 4*(n.y + n.x -1)*(AUC.hat -0.5)^2)/div.LT)
 }
 # p.stat for Halperin Mee method
 p.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
@@ -168,7 +183,8 @@ p.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   p1 <- (n.y*n.x^2*Q2 - U.sq)/(n.y*n.x*(n.x-1))
   return(data.frame(p1=p1,p2=p2))
 }
-Halperin.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
+##### after validation of new one, replace old one.
+Mee.stat.old <- function(x, y, n.x=length(x), n.y=length(y)) {
   ranks = rank(c(x,y))
   rank.x <- ranks[1:n.x]
   rank.y <- ranks[-1:-n.x]
@@ -184,14 +200,28 @@ Halperin.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   N.J.hat = n.x*n.y/(((n.x-1)*rho.hat$p1 +1)/(1-1/n.y) + ((n.y-1)*rho.hat$p2 + 1 )/(1-1/n.x) )
   return(data.frame(p1=p$p1, p2=p$p2, AUC.hat=AUC.hat, N.J.hat=N.J.hat))
 }
-V.Halperin <- function(x, y, n.x=length(x), n.y=length(y), AUC=AUC(x,y,n.x,n.y), LT=FALSE) {
-  N.J.hat = Halperin.stat(x,y,n.x,n.y)$N.J.hat
+### new one. replace the old one after validation!!
+Mee.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
+  AUC.hat.0 <- AUC.hat <- AUC(x, y, n.x, n.y)
+  increment = ifelse(AUC.hat < 0.5, +0.5, -0.5)
+  while (min(AUC.hat,1-AUC.hat)*sqrt(n.x*n.y) < 0.5){
+    y = y + increment
+    AUC.hat = AUC(x, y, n.x, n.y)
+  }
+  p = p.stat(x, y, n.x, n.y)
+  rho.hat = (p-AUC.hat^2)/(AUC.hat-AUC.hat^2)
+  N.J.hat = n.x*n.y/(((n.x-1)*rho.hat$p1 +1)/(1-1/n.y) + ((n.y-1)*rho.hat$p2 + 1 )/(1-1/n.x) )
+  return(data.frame(AUC.hat=AUC.hat.0, p1=p$p1, p2=p$p2, N.J.hat=N.J.hat))
+}
+V.Mee <- function(x, y, n.x=length(x), n.y=length(y), AUC=AUC(x,y,n.x,n.y), LT=FALSE, sample.var=TRUE) {
+  # sample.var is not relevant. for compatibility purpose. (V.Mee is upward biased)
+  N.J.hat = Mee.stat(x,y,n.x,n.y)$N.J.hat
   V = AUC*(1-AUC) / N.J.hat
   if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
   return( V/div.LT )
 }
-Halperin.equation <- function(AUC, AUC.hat, x, y, n.x, n.y, alpha, MI=NA, LT=FALSE){
-  W = V.Halperin(x, y, n.x, n.y, AUC, LT=LT)
+Mee.equation <- function(AUC, AUC.hat, x, y, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=TRUE){
+  W = V.Mee(x, y, n.x, n.y, AUC, LT=LT, sample.var=sample.var)
   Rubin = Rubin(W=W, MI=MI, alpha=alpha)
   V = Rubin$v.final         # W + (1/m)*B for MI
   z.val = Rubin$z.val       # t value for MI

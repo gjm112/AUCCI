@@ -129,7 +129,8 @@ param.finder = function(param = "beta1", start, target, digit = 1, target.digit=
   
   repeat{
     pb <- txtProgressBar(min=0, max = n.sample, char = paste0("R3-",iter), style=3)
-    n.sample = min(max(round((stdev/tolerance)^2,-2),300), final.nsample)
+    # n.sample = min(max(round((stdev/tolerance)^2,-2),300), final.nsample)
+    n.sample = 400
     print(paste("iteration:" ,iter, ", n.sample:", n.sample))
     if (init.sign * sign(err) < 0 | ((param.val %in% result$final) & (iter > 4))) {break}
     tht <- rep(NA,n.sample)
@@ -143,6 +144,7 @@ param.finder = function(param = "beta1", start, target, digit = 1, target.digit=
       tht[j] <- AUC(temp$marker[temp$disease==0], temp$marker[temp$disease==1])
       if (j %% floor(n.sample/20) == 0) {print(mean(tht, na.rm=TRUE))}
     }
+    write.csv(tht,paste0("theta95-betaone-",param.val,".csv"))
     print(tht); print(tht.mean <- mean(tht)); print(range(tht))
     stdev = sd(tht)
 

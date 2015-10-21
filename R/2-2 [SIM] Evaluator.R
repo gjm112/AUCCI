@@ -3,14 +3,14 @@
 
 ## 2.2.1 CI.evaluator #####################################################################
 CI.evaluator = function(data, param = 2, est = 3, n.i,
-                        method = sub(".lb","",matrix(names(data[[est]])[-1],nrow=2)[1,]),
+                        CI.method = sub(".lb","",matrix(names(data[[est]])[-1],nrow=2)[1,]),
                         na.rm = TRUE) {
   msmt = c("CP","LNCP","RNCP","CIL", "ZWI")
   
   # data formatting
-  len.col = length(method); len.row = length(msmt)
+  len.col = length(CI.method); len.row = length(msmt)
   eval = as.data.frame(matrix(NA,len.row,len.col))
-  names(eval) = method
+  names(eval) = CI.method
   rownames(eval) = msmt
   
   # informations
@@ -25,7 +25,7 @@ CI.evaluator = function(data, param = 2, est = 3, n.i,
   temp.1[,seq(2,2*len.col,by=2)] = (temp[,seq(2,2*len.col,by=2)] >= theta)
   
   temp.2 = temp.1[,seq(1,2*len.col-1,by=2)]
-  names(temp.2) = method
+  names(temp.2) = CI.method
   
   for (i in 1:len.col) {temp.2[,i] = temp.1[,2*i-1]*temp.1[,2*i]}
   # CP

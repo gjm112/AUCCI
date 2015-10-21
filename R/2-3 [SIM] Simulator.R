@@ -45,13 +45,13 @@ param1 = list(alphabet = data.frame(phi = rep(c(.5,.7), each=3),
 
 ## 2.3.1.3 Param2 - Simulation ###########################################################
 n = c(200, 100, 50); n.max = max(n)
-n.sim = 10000    # To be changed to 10,000
+n.sim = 1000    # To be changed to 10,000
 alpha = c(0.1, 0.05, 0.01)
 
 # CI.methods from 1-1 [CI] Base functions.R
-CI.methods = c("HanleyMcNeilWald", "HanleyMcNeilExponential", "HanleyMcNeilScore", 
-               "NewcombeExponential", "NewcombeScore", "CortesMohri", "ReiserGuttman", 
-               "Bamber", "HalperinMee", "DoubleBeta", "DoubleGaussian", "DeLong")
+CI.methods = c("Bm", "HM1", "HM2", "NS1", "NW", "NS2", "Mee", "DL", "RG", "DB", "DG", "CM")
+
+AUC.fun = AUCCI
 
 ## 2.3.2 Simulator #######################################################################
 
@@ -100,7 +100,7 @@ CI.methods = c("HanleyMcNeilWald", "HanleyMcNeilExponential", "HanleyMcNeilScore
         len = n[p]
         for (k in 1:n.sim) {
           # B. Inferences(from 1.)
-          temp.est.n[k,]<- CI.i(temp.sim[[k]][1:len,],CI.methods, type="landscape2")
+          temp.est.n[k,]<- CI.i(temp.sim[[k]][1:len,],fun=AUC.fun, CI.method=CI.methods, type="landscape2")
           setTxtProgressBar(pb,k + (p-1)*n.sim)
         }
         temp.est[[p]] = temp.est.n
@@ -113,7 +113,7 @@ CI.methods = c("HanleyMcNeilWald", "HanleyMcNeilExponential", "HanleyMcNeilScore
       # C. Evaluation of B
       temp.eval <- list()
       for (p in 1:length(n)) {      # 200, 100, 50
-        temp.eval[[p]] <- CI.evaluator(temp.d3, param = 2, est = 3, n.i = p, method = CI.methods, na.rm = na.rm)      
+        temp.eval[[p]] <- CI.evaluator(temp.d3, param = 2, est = 3, n.i = p, CI.method = CI.methods, na.rm = na.rm)      
       }
       temp.d2[[j]]$eval <- temp.eval
     }
@@ -135,7 +135,7 @@ sim.data.0927 <- readRDS("sim_data_0927.rds")
   for (i in 1:d1) {
     for (j in 1:d2){ 
       for (p in 1:d3) {
-        sim.data[[i]][[j]]$eval[[p]] <- CI.evaluator(sim.data[[i]][[j]], param = 2, est = 3, n.i = p, method = CI.methods, na.rm = na.rm)
+        sim.data[[i]][[j]]$eval[[p]] <- CI.evaluator(sim.data[[i]][[j]], param = 2, est = 3, n.i = p, CI.method = CI.methods, na.rm = na.rm)
       }
     }
   }

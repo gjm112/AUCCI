@@ -11,6 +11,13 @@ library(norm)         # for Multiple Imputation
 MI.methods = data.frame(functions=c(rep("mice",2),rep("norm",1)), methods=c("pmm","logreg","imp.norm"))
 ########################################################################################
 
+MI.norm <- function(data) {
+  data.mat <- data.matrix(data)
+  s <- prelim.norm(data.mat)
+  mle <- em.norm(s)
+  imp.norm(s = s, theta = mle, x = data.mat)
+}
+
 
 ## 1.5.1 AUCCI.MI ##################################################################### 
 
@@ -51,69 +58,71 @@ AUCCI.MI = function(data, MI.function, MI.method, m, CI.method, alpha=.05, LT=FA
   
   # C. CI stage
   # Categorizing CI types
-  CI.Wald = c("HanleyMcNeilWald", "HanleyMcNeilExponential", "NewcombeExponential", 
-              "CortesMohri", "Bamber", "MannWhitney", "DeLong")
-  CI.Score = c("HanleyMcNeilScore", "NewcombeScore", "HalperinMee", "WilsonScore")
-  CI.root = c("DoubleBeta", "DoubleGaussian")
-  CI.Gauss = c("ReiserGuttman")
-  CI.other = c("MannWhitneyLT", "ClopperPearson")
+  CI.Wald = c("HM1", "HM2", "NW", "CM", "Bam", "DL")
+  CI.Score = c("NS1", "NS2", "Mee", "WS")
+  CI.root = c("DB", "DG")
+  CI.other = c("RG")
   
   if (CI.method %in% CI.Wald) {
     for (i in 1:m) {
-      mi.stat$var.LT[i] = AUCCI(data.comp[[i]], method=CI.method, disease="diseaseR", alpha=alpha, variance = TRUE, LT=LT)$V.hat
+      mi.stat$var.LT[i] = AUCCI(data.comp[[i]], method=CI.method, disease="diseaseR", alpha=alpha, variance = TRUE, LT=LT, ...)$V.hat
     }
     Rubin = Rubin(W=mean(mi.stat$var.LT), MI=mi.stat$theta.LT, alpha=alpha, print.nu = TRUE)
     var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
     nu.LT = Rubin$nu             # degree of freedom for MI
     CI.LT = CI.base(mean.MI.LT, var.MI.LT, alpha, qt, df=nu.LT)    # logit scale (will back-transform in the end)
+    CI = expit(CI.LT, LT=LT)
   }
-  if (CI.method %in% CI.Score) {
-    if (CI.method == "HanleyMcNeilScore") {
-      CI = multiroot(HMS.equation, c(0.5,0.9), AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT)$root}
-    else if (CI.method == "NewcombeScore") {
-      CI = multiroot(NC.equation, c(0.5,0.9), AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT)$root}  
-    else if (CI.method == "HalperinMee") {
-      CI = multiroot(Halperin.equation, c(0.5,0.9), AUC.hat=mean.MI, x=x, y=y, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT)$root
+  
+  else if (CI.method %in% CI.Score) {
+    start = c( max(mean.MI - 0.1, mean.MI/2), min(mean.MI + 0.1, (mean.MI+1)/2))
+    if (CI.method == "NS1") {
+      CI = multiroot(HMS.equation, start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, ...)$root}
+    else if (CI.method == "NS2"){
+      CI = multiroot(NC.equation,  start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, ...)$root}  
+    else if (CI.method == "Mee") {
+      CI = multiroot(Mee.equation,  start, AUC.hat=mean.MI, x=x, y=y, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, ...)$root
     }
-    
     CI.LT = logit(CI,LT=LT)
     if (variance) {
       for (i in 1:m) {
-        mi.stat$var.LT[i] = AUCCI(data.comp[[i]], method=CI.method, disease="diseaseR", alpha=alpha, variance = TRUE, LT=LT)$V.hat
+        mi.stat$var.LT[i] = AUCCI(data.comp[[i]], method=CI.method, disease="diseaseR", alpha=alpha, variance = TRUE, LT=LT, ...)$V.hat
       }
       Rubin = Rubin(W=mean(mi.stat$var.LT), MI=mi.stat$theta.LT, alpha=alpha)
       var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
     }
   }
-  if (CI.method %in% CI.root) {
-    if (CI.method == "DoubleBeta") {
+  
+  else if (CI.method %in% CI.root) {
+    if (CI.method == "DB") {
       CI = DB(AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT)
       CI.LT = logit(CI, LT=LT)
       if (variance) {
         MI.DB = data.frame(alp = rep(NA, m), var = rep(NA, m))
         for (i in 1:m) {
           MI.DB$alp[i] = multiroot(DB.equation, c(1,3), AUC.hat=mi.stat$theta[i], n.x=n.x, n.y=n.y, alpha=1 ,LT=LT)$root[1]
-          MI.DB$var.LT[i] = V.DB(MI.DB$alp[i], n.x, n.y, LT=LT)
+          MI.DB$var.LT[i] = V.DB(MI.DB$alp[i], n.x, n.y, LT=LT, ...)
         }
         Rubin = Rubin(W=mean(MI.DB$var.LT), MI=mi.stat$theta.LT, alpha=alpha)
         var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
       }
     }
-    else if (CI.method == "DoubleGaussian") {
-      CI = DG(AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT)
+    
+    else if (CI.method == "DG") {
+      CI = DG(AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, ...)
       CI.LT = logit(CI, LT=LT)
       if (variance) {
         MI.DG = data.frame(delta = rep(NA, m), var.LT = rep(NA, m))
         for (i in 1:m) {
           MI.DG$delta[i] = multiroot(DG.equation, c(1,3), AUC.hat=mi.stat$theta[i], n.x=n.x, n.y=n.y, alpha=1,LT=LT)$root[1]
-          MI.DG$var.LT[i] = V.DG(MI.DG$delta[i], n.x, n.y, LT=LT)
+          MI.DG$var.LT[i] = V.DG(MI.DG$delta[i], n.x, n.y, LT=LT, ...)
         }
         Rubin = Rubin(W=mean(mi.stat$var.LT), MI=mi.stat$theta.LT, alpha=alpha)
         var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
       }
     }
   }  
-  if (CI.method == "ReiserGuttman") {         # LT, variance not available
+  else if (CI.method == "RG") {         # LT, variance not available
     MI.RG = data.frame(delta = rep(NA, m), var = rep(NA, m))
     for (i in 1:m) {
       temp = data2xy(data.comp[[i]],disease="diseaseR", marker="marker")
@@ -132,6 +141,8 @@ AUCCI.MI = function(data, MI.function, MI.method, m, CI.method, alpha=.05, LT=FA
     mean.MI=pnorm(delta.mean)
     var.MI.LT = NA
   }
+  
+  else {warning(paste(CI.method,"is not available"))} 
   
   result = list(AUC.hat = mean.MI, CI = CI);  if (variance) {result$V.hat = var.MI.LT}; if (MI.thetas) {result$theta.MI = mi.stat$theta; result$theta.LT = mi.stat$theta.LT }
   return(result)

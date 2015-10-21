@@ -3,32 +3,32 @@
 
 ## 1.4.1 AUCCI.boot ##################################################################### 
 ### Bootstrap CI for AUC with verification bias
-AUCCI.boot = function(x,R,alpha,fun,logit=TRUE,...) {
+AUCCI.boot = function(x,R,alpha,fun,print.boots = FALSE, variance=FALSE, LT=TRUE,...) {
   # x: dataframe of the sample data
   # R: number of replicates
   # fun: AUC function
   n = dim(x)[1]
   boot.sample.indices = matrix(sample(1:n,size=n*R,replace=TRUE), R, n)
-  
+  AUC.hat = fun(x,...)
   AUC.hats = rep(NA,R)
   for (i in 1:R) {AUC.hats[i] = fun(x[boot.sample.indices[i,],],...)}
   mu.hat = fun(x,...)
-  result = list(boot.statistics = AUC.hats)
-  if (logit == TRUE) {
-    mu.hat.logit = logit(mu.hat)
-    AUC.hats.logit = logit(AUC.hats)
-    se.logit = sd(AUC.hats.logit, na.rm=TRUE)
-    interval.logit = mu.hat.logit + c(-1,1)*(-qnorm(alpha/2))*se.logit
-    interval = (exp(interval.logit)^-1 +1)^-1
-    result$interval = interval
-    result$se.logit = se.logit
+  result = list(AUC.hat = AUC.hat)
+  if (print.boots) {result$boot.statistics = AUC.hats}
+  if (LT == TRUE) {
+    mu.hat.LT = logit(mu.hat)
+    AUC.hats.LT = logit(AUC.hats)
+    se.LT = sd(AUC.hats.LT, na.rm=TRUE)
+    interval.LT = mu.hat.LT + c(-1,1)*(-qnorm(alpha/2))*se.LT
+    interval = (exp(interval.LT)^-1 +1)^-1
+    result$CI = interval
+    if (variance) {result$variance = (se.LT*AUC.hat*(1-AUC.hat))^2}
   } else {
     se = sd(AUC.hats, na.rm=TRUE)
     interval = mu.hat + c(-1,1)*(-qnorm(alpha/2))*se
-    result$interval = interval
-    result$se = se
+    result$CI = interval
+    if (variance) {result$variance = se^2}
   }
-  print( interval )
   return( result )
 }
 
