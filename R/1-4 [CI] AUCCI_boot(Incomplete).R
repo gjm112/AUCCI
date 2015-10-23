@@ -3,16 +3,16 @@
 
 ## 1.4.1 AUCCI.boot ##################################################################### 
 ### Bootstrap CI for AUC with verification bias
-AUCCI.boot = function(x,R,alpha,fun,print.boots = FALSE, variance=FALSE, LT=TRUE,...) {
+AUCCI.boot = function(x,R,alpha=0.05,base.fun=AUC.verif,print.boots = FALSE, variance=FALSE, LT=TRUE,...) {
   # x: dataframe of the sample data
   # R: number of replicates
-  # fun: AUC function
+  # base.fun: AUC function
   n = dim(x)[1]
   boot.sample.indices = matrix(sample(1:n,size=n*R,replace=TRUE), R, n)
-  AUC.hat = fun(x,...)
+  AUC.hat = base.fun(x,...)
   AUC.hats = rep(NA,R)
-  for (i in 1:R) {AUC.hats[i] = fun(x[boot.sample.indices[i,],],...)}
-  mu.hat = fun(x,...)
+  for (i in 1:R) {AUC.hats[i] = base.fun(x[boot.sample.indices[i,],],...)}
+  mu.hat = base.fun(x,...)
   result = list(AUC.hat = AUC.hat)
   if (print.boots) {result$boot.statistics = AUC.hats}
   if (LT == TRUE) {
@@ -31,6 +31,3 @@ AUCCI.boot = function(x,R,alpha,fun,print.boots = FALSE, variance=FALSE, LT=TRUE
   }
   return( result )
 }
-
-## Example ############################################################################## 
-AUCCI.boot(temp,R=100,alpha=.05,fun=AUC.verif,method="BG")

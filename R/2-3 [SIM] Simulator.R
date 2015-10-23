@@ -38,8 +38,8 @@ param1 = list(alphabet = data.frame(phi = rep(c(.5,.7), each=3),
                                     theta = c(0.7999914248, 0.89999851, 0.950002331, 0.800002545, 0.899999218, .95), 
                                     theta.SE =c(5.80868E-06,4.09076E-06,2.76121E-06,7.79383E-06, 5.34159E-06, 0) ,
                                     alpha0 = rep(c(0,1.6111), each=3), 
-                                    beta1=c(0.8089, 1.4486, 1.97674,.8319,1.47286,2.0024)), 
-              gamma = data.frame(q1 = c(.8, .95), q2 = c(.9, .95), q3=q1, q4=q2, gamma = c(.8, .95)))
+                                    beta1=c(0.8089, 1.4486, 1.97674,.8319,1.47286,2.00187)), 
+              gamma = data.frame(q1 = c(.7, .8), q2 = c(.8, .9), q3=q1, q4=q2, gamma = c(.7, .8)))
 # alpha0 = 0 for phi==0, alpha0 = 1.6111 for phi==.7
 # q3= q1, q4= q2: MAR settings
 
@@ -51,7 +51,13 @@ alpha = c(0.1, 0.05, 0.01)
 # CI.methods from 1-1 [CI] Base functions.R
 CI.methods = c("Bm", "HM1", "HM2", "NS1", "NW", "NS2", "Mee", "DL", "RG", "DB", "DG", "CM")
 
-AUC.fun = AUCCI
+# MI.methods from 1-5 [CI] AUCCI_MI
+MI.methods = data.frame(functions=c(rep("mice",2),rep("norm",1)), methods=c("pmm","logreg","imp.norm"))
+m = 10
+
+# Direct methods with bootstrap. R = # of resamples
+Dir.methods = c("naive", "BG", "MS", "SP", "IPW", "He")
+R = 30
 
 ## 2.3.2 Simulator #######################################################################
 
@@ -71,11 +77,8 @@ AUC.fun = AUCCI
   # temp.eval           = a dataframe of evaluation of the estimators
   
   # creating empty lists
-  sim.data  <- temp.d1 <- temp.d2 <- temp.d3 <- temp.sim <- temp <- list() 
-  temp.est <- list()
-  temp.est.n <- as.data.frame(matrix(NA,n.sim,(length(CI.methods)*2+1)))
-  names(temp.est.n) <- c("AUC.hat",paste0(rep(CI.methods,each=2),c(".lb",".ub")))
-  
+  sim.data  <- temp.d1 <- temp.d2 <- temp.d3 <- temp.sim <- temp.n <- temp <- list() 
+    
   # loop
   for (i in 1:d1) {
     alpha0 = param1$alphabet$alpha0[i]
@@ -89,33 +92,90 @@ AUC.fun = AUCCI
       q2  = param1$gamma$q2[j]
       q3  = param1$gamma$q3[j]
       q4  = param1$gamma$q4[j]
-      pb <- txtProgressBar(min=0, max = n.sim, char = paste0((i-1)*2+j, "/",d1*d2," (DataGen)|"), style=3)
-      for (k in 1:n.sim) {
+        
+      for (h in 1:length(n)) {
+        pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d1*d2*length(n)," (DataGen)|"), style=3)
+
         # A. Data generation(from 2.)
-        temp.sim[[k]] <- temp <- datagenerator(n=n.max, alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, option="VDTR")
-        setTxtProgressBar(pb,k)
-      }
-      pb <- txtProgressBar(min=0, max = n.sim*length(n), char = paste0((i-1)*2+j, "/",d1*d2," (Estimate)|"), style=3)
-      for (p in 1:d3) {      # 200, 100, 50
-        len = n[p]
         for (k in 1:n.sim) {
-          # B. Inferences(from 1.)
-          temp.est.n[k,]<- CI.i(temp.sim[[k]][1:len,],fun=AUC.fun, CI.method=CI.methods, type="landscape2")
-          setTxtProgressBar(pb,k + (p-1)*n.sim)
+          temp.sim[[k]] <- temp <- datagenerator(n=n[h], alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, option="VDTR")
+          setTxtProgressBar(pb,k)
         }
-        temp.est[[p]] = temp.est.n
+        temp.n[[h]] <- temp.sim
+        
+        # B. Imputation
+        # input: temp.n[[h]] / output: temp.MI
+        temp.MI <- temp.MI.sim <- list()
+        for (l in MI.methods[,"methods"]) {
+          pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d1*d2*length(n)," (MI-",l,")|"), style=3)
+          if (l == "pmm" |l == "logreg") {
+            for (k in 1:n.sim) {
+              temp.imp <- mice(data=temp.sim[[k]], method=l, m=m, predictorMatrix=cbind(0,(1 - diag(1, ncol(temp.sim[[k]])))[,-1]), printFlag=FALSE)
+              temp.comp <- list()
+              for (q in 1:m) {temp.comp[[q]] = complete(temp.imp, action = q)[,c("diseaseR", "marker")]}
+              temp.MI.sim[[k]] <- temp.comp
+              setTxtProgressBar(pb,k)
+            }
+            temp.MI[[l]] = temp.MI.sim
+          }
+          else if (l == "imp.norm") {
+            ###TBD!!!!!!
+            temp.MI[[l]] = temp.MI[[1]]  # proxy (pmm is copied)
+          }
+          else {print("Wrong MI method!")}
+        }
+        
+        # C-1. Inferences (complete datasets)
+        pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d1*d2*length(n)," (Est.com-)|"), style=3)  
+        temp.est <- as.data.frame(matrix(NA,n.sim,(length(CI.methods)*2+1)))
+        names(temp.est) <- c("AUC.hat",paste0(rep(CI.methods,each=2),c(".lb",".ub")))
+        for (k in 1:n.sim) {
+          temp.est[k,] <- CI.i(temp.sim[[k]],fun=AUCCI, CI.method=CI.methods, type="landscape2")
+          setTxtProgressBar(pb,k)
+        }
+        
+        # C-2. Inferences (incomplete datasets with MI)
+        temp.estMI <- list()
+        temp.estMI.n <- as.data.frame(matrix(NA,n.sim,(length(CI.methods)*2+1)))
+        names(temp.estMI.n) <- c("AUC.hat",paste0(rep(CI.methods,each=2),c(".lb",".ub")))
+        for (l in MI.methods[,"methods"]) {
+          pb <- txtProgressBar(min=0, max = n.sim*3, char = paste0(((i-1)*2+j-1)*3+h, "/",d1*d2*length(n)," (Est.MI-",l,")|"), style=3)
+          l.index = which(l ==MI.methods[,"methods"] )
+          for (k in 1:n.sim) {
+            temp.estMI.n[k,] <- CI.i(temp.MI[[l]][[k]], fun=AUCCI.MI, CI.method=CI.methods, m=m, type="landscape2")
+            setTxtProgressBar(pb,k + (l.index-1)*n.sim)
+          }
+          temp.estMI[[l]] <- temp.estMI.n
+        }
+        
+        # C-3. Inferences (incomplete datasets with Direct methods(Bootstrapping))
+        temp.estDir <- as.data.frame(matrix(NA,n.sim,(length(Dir.methods)*2+1)))
+        names(temp.estDir) <- c("AUC.hat",paste0(rep(Dir.methods,each=2),c(".lb",".ub")))
+        pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d1*d2*length(n)," (Est.Dir-)|"), style=3)
+        for (k in 1:n.sim) {
+          temp.estDir[k,] <- CI.i(data=temp.n[[h]][[k]], fun=AUCCI.boot, R=R, CI.method=Dir.methods, type="landscape2")
+          setTxtProgressBar(pb,k)
+        }
+        
+        # storing A ~ C-2
+        temp.d3[[h]] <- temp.d4 <- list(parm = data.frame(theta=theta, phi=phi, gamma=gamma),
+                                        sim = temp.sim,
+                                        MI = temp.MI,
+                                        est.com = temp.est,
+                                        est.MI = temp.estMI,
+                                        est.Dir = temp.estDir) 
+
+        # D-1. Evaluation of C-1(est.com)
+        temp.eval <- list()
+        temp.eval[["1. complete"]] <- CI.evaluator(temp.d4[["est.com"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+        temp.eval[["2. pmm"]] <- CI.evaluator(temp.d4[["est.MI"]][["pmm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+        temp.eval[["3. logreg"]] <- CI.evaluator(temp.d4[["est.MI"]][["logreg"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+        temp.eval[["4. imp.norm"]] <- CI.evaluator(temp.d4[["est.MI"]][["imp.norm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+        temp.eval[["5. Bootstrap"]] <- CI.evaluator(temp.d4[["est.Dir"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
+        temp.d3[[h]]$eval <- temp.eval
       }
 
-      # storing A and B
-      temp.d2[[j]] <- temp.d3 <- list(sim = temp.sim, 
-                                      parm = data.frame(theta=theta, phi=phi, gamma=gamma),
-                                      est = temp.est) 
-      # C. Evaluation of B
-      temp.eval <- list()
-      for (p in 1:length(n)) {      # 200, 100, 50
-        temp.eval[[p]] <- CI.evaluator(temp.d3, param = 2, est = 3, n.i = p, CI.method = CI.methods, na.rm = na.rm)      
-      }
-      temp.d2[[j]]$eval <- temp.eval
+      temp.d2[[j]] <- temp.d3
     }
     temp.d1[[i]] <- temp.d2
   }
@@ -124,13 +184,13 @@ AUC.fun = AUCCI
 }
 
 ## Optional: saving the datafile  ########################################################
-saveRDS(sim.data, "sim_data_0927.rds")
+saveRDS(sim.data, "sim_data_1022.rds")
 sim.data.0927 <- readRDS("sim_data_0927.rds")
 
 ## 2.3.2.2 Simulation by part (Evaluation only)  #########################################
 {
   # d1 = 6; d2 = 2;na.rm=ra.rm; set.seed=...
-  # loop
+  # need to be updated if want to use this
   set.seed(100)
   for (i in 1:d1) {
     for (j in 1:d2){ 
@@ -142,9 +202,9 @@ sim.data.0927 <- readRDS("sim_data_0927.rds")
 }
 
 
-## Example: checking prevalence rate #####################################################
-for(i in 1:20) {print(mean(sim.data[[2]][[2]][[1]][[i]]$R))}
-
+## Example: checking missing rate #####################################################
+for(i in 1:20) {print(mean(sim.data[[6]][[2]][[1]][[i]]$R, na.rm=T))}
+sim.data.complete <- sim.data
 ## addressing example
 # phi = .7, theta=.8  (=> 4th)
 # rho = .5            (=> 1th)

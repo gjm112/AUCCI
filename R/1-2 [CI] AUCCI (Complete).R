@@ -138,7 +138,7 @@ CI.i <- function(data, fun=AUCCI, CI.method=CI.methods, type="landscape2", ...) 
     for (i in 1:length(CI.method)) { CI.i[,i+1] = fun(data, CI.method = CI.method[i], ...)$CI }
   } else if (type == "landscape2") {
     CI.i = as.data.frame(matrix(NA,1,length(CI.method)*2+1))
-    names(CI.i) = c("AUC.hat",paste0(rep(CI.methods,each=2),c(".lb",".ub")))
+    names(CI.i) = c("AUC.hat",paste0(rep(CI.method,each=2),c(".lb",".ub")))
     CI.i$AUC.hat = fun(data, CI.method = CI.method[1],...)$AUC.hat
     for (i in 1:length(CI.method)) { CI.i[1,(2*i):(2*i+1)] = fun(data, CI.method = CI.method[i], ...)$CI }  
   } else if (type=="portrait") {

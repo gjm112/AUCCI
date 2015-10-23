@@ -96,7 +96,7 @@ Q.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   for (j in 1:n.y) {Q2 = Q2 + ( sum(y[j] > x) + sum(y[j]==x)/2 )^2}; Q2 = Q2 /(n.x^2 * n.y)
   return(data.frame(Q1 = Q1, Q2 = Q2))
 }
-V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1), LT=FALSE, sample.var=TRUE) {
+V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1), LT=FALSE, sample.var=TRUE, ...) {
   # default: HME method
   if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
   nxny = ifelse(sample.var, (n.x-1)*(n.y-1), n.x*n.y)  # sample.var: dividing by (nx-1)(ny-1) is unbiased
@@ -104,22 +104,22 @@ V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1), LT=FAL
 }
 
 ### for score method it should be populatoin variance not sample variance (sample.var=FALSE).
-###1 ################## Formula 1: fixed B.hat
-HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=FALSE) {
+HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=FALSE, score.MI = "fixed.r") {
   W = V.HM(AUC, n.x, n.y, LT=LT, sample.var=sample.var)
-  Rubin = Rubin(W=W, MI=MI, alpha=alpha)
-  V = Rubin$v.final         # W + (1/m)*B for MI
-  z.val = Rubin$z.val       # t value for MI
-  return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
-}
-###2 ################## Formula 2: fixed r.hat
-HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=FALSE) {
-  W = V.HM(AUC, n.x, n.y, LT=LT, sample.var=sample.var)
-  W.hat = V.HM(AUC.hat, n.x, n.y, LT=LT, sample.var=sample.var)
-  Rubin = Rubin(W=W.hat, MI=MI, alpha=alpha, print.r=TRUE)
-  r = Rubin$r
-  z.val = Rubin$z.val       # nu is fixed (since r is fixed)
-  return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(W*(1+r)) - logit(AUC.hat,LT=LT))
+  if (score.MI == "fixed.r") {
+    ## 1. fixed r
+    W.hat = V.HM(AUC.hat, n.x, n.y, LT=LT, sample.var=sample.var)
+    Rubin = Rubin(W=W.hat, MI=MI, alpha=alpha, print.r=TRUE)
+    z.val = Rubin$z.val       # nu is fixed (since r is fixed)
+    r = Rubin$r
+    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(W*(1+r)) - logit(AUC.hat,LT=LT))  
+  } else if (score.MI == "fixed.B") {
+    ## 2. fixed B hat
+    Rubin = Rubin(W=W, MI=MI, alpha=alpha)
+    V = Rubin$v.final         # W + (1/m)*B for MI
+    z.val = Rubin$z.val       # t value for MI
+    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
+  }
 }
 
 V.NC <- function(AUC, n.x, n.y, LT=FALSE, sample.var=TRUE) {
@@ -128,12 +128,21 @@ V.NC <- function(AUC, n.x, n.y, LT=FALSE, sample.var=TRUE) {
   if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
   return( AUC*(1-AUC)/nxny * ( (2*N-1) - (3*N-3) / ((2-AUC)*(AUC+1)) )/div.LT )
 }
-NC.equation <- function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=TRUE) {
+NC.equation <- function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=TRUE, score.MI = "fixed.r") {
   W = V.NC(AUC, n.x, n.y, LT=LT, sample.var=sample.var)
-  Rubin = Rubin(W=W, MI=MI, alpha=alpha)
-  V = Rubin$v.final         # W + (1/m)*B for MI
-  z.val = Rubin$z.val       # t value for MI
-  return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
+  if (score.MI == "fixed.r") {
+    ## 1. fixed r
+    W.hat = V.NC(AUC.hat, n.x, n.y, LT=LT, sample.var=sample.var)
+    Rubin = Rubin(W=W.hat, MI=MI, alpha=alpha, print.r=TRUE)
+    z.val = Rubin$z.val       # nu is fixed (since r is fixed)
+    r = Rubin$r
+    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(W*(1+r)) - logit(AUC.hat,LT=LT))  
+  } else if (score.MI == "fixed.B") {
+    Rubin = Rubin(W=W, MI=MI, alpha=alpha)
+    V = Rubin$v.final         # W + (1/m)*B for MI
+    z.val = Rubin$z.val       # t value for MI
+    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
+  }
 }
 V.CM <- function(AUC, n.x, n.y, LT=FALSE){
   z1 = function (w, n.x, n.y, k) {1-0.5*(w/n.y+(k-w)/n.x)}
@@ -220,12 +229,21 @@ V.Mee <- function(x, y, n.x=length(x), n.y=length(y), AUC=AUC(x,y,n.x,n.y), LT=F
   if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
   return( V/div.LT )
 }
-Mee.equation <- function(AUC, AUC.hat, x, y, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=TRUE){
+Mee.equation <- function(AUC, AUC.hat, x, y, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=TRUE, score.MI = "fixed.r"){
   W = V.Mee(x, y, n.x, n.y, AUC, LT=LT, sample.var=sample.var)
-  Rubin = Rubin(W=W, MI=MI, alpha=alpha)
-  V = Rubin$v.final         # W + (1/m)*B for MI
-  z.val = Rubin$z.val       # t value for MI
-  return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
+  if (score.MI == "fixed.r") {
+    ## 1. fixed r
+    W.hat = V.Mee(x, y, n.x, n.y, AUC.hat, LT=LT, sample.var=sample.var)
+    Rubin = Rubin(W=W.hat, MI=MI, alpha=alpha, print.r=TRUE)
+    z.val = Rubin$z.val       # nu is fixed (since r is fixed)
+    r = Rubin$r
+    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(W*(1+r)) - logit(AUC.hat,LT=LT))  
+  } else if (score.MI == "fixed.B") {
+    Rubin = Rubin(W=W, MI=MI, alpha=alpha)
+    V = Rubin$v.final         # W + (1/m)*B for MI
+    z.val = Rubin$z.val       # t value for MI
+    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
+  }
 }
 V.DB <- function(alp, n.x, n.y, LT=FALSE) {
   R1 = gamma(alp + 1)^2 / gamma(2*alp + 1)

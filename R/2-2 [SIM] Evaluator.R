@@ -2,9 +2,12 @@
 ## 2-2 [SIM] Evaluator: 2.2.1 CI.evaluator ################################################
 
 ## 2.2.1 CI.evaluator #####################################################################
-CI.evaluator = function(data, param = 2, est = 3, n.i,
-                        CI.method = sub(".lb","",matrix(names(data[[est]])[-1],nrow=2)[1,]),
-                        na.rm = TRUE) {
+CI.evaluator = function(data, param, CI.method = sub(".lb","",matrix(names(data)[-1],nrow=2)[1,]),
+                        na.rm = TRUE, round=Inf) {
+  # data: a data.frame of CI.method by n.sim
+  # param: a data.frame that has theta values
+  # round: # of decimal points
+  
   msmt = c("CP","LNCP","RNCP","CIL", "ZWI")
   
   # data formatting
@@ -14,10 +17,10 @@ CI.evaluator = function(data, param = 2, est = 3, n.i,
   rownames(eval) = msmt
   
   # informations
-  theta = data[[param]]$theta
+  theta = param$theta
   
   # CP calculation
-  temp.1 <- temp <- data[[est]][[n.i]][,-1];
+  temp.1 <- temp <- data[,-1];
   temp.1[,] <- 0
   # 1 if lowerbound captures theta, 0 otherwise
   temp.1[,seq(1,2*len.col-1,by=2)] = (temp[,seq(1,2*len.col-1,by=2)] < theta)
@@ -38,5 +41,8 @@ CI.evaluator = function(data, param = 2, est = 3, n.i,
   # ZWI
   eval[5,] = apply((temp.3 == 0), 2, mean, na.rm=na.rm)
   
-  return(eval)
+  return(round(eval,round))
+  # if want to remove scientific notations,
+  # apply "format(xx, scientific=F)" to each single cells, not to the whole dataframe(subject to error)
+  # or manipulate the global setting: option(scipen = 999) and then return it by option(scipen = 0).
 }

@@ -32,39 +32,3 @@ datagenerator <- function(n, alpha0, alpha1, beta0, beta1, beta2, beta3, sig, q1
     }
   }
 }
-
-## parameters for pilot test 
-{
-  mu.V = rep(0,5)
-  Sigma = matrix(c(1, 0, 0.3, 0.4, -0.4, 0, 1, 0.2, 0.2, 0, 0.3, 0.2, 1, 0.7, -0.5, 0.4, 0.2, .7, 1, -0.2, -0.4, 0, -0.5, -0.2, 1), 5,5)
-  alpha0 = 0
-  alpha1 = rep(1,5)
-  beta0 = 0
-  beta1 = 0.8089
-  beta2 = rep(0.1,5)
-  beta3 = rep(0.05,5)
-  sig = 1
-  q1 = 0.8
-  q2 = 0.95
-  q3 = 0.7
-  q4 = 0.90
-  gamma = 0.2
-}
-
-### theta_(1+2+..+10) almost equals average(theta_1, ... theta_10) 
-{ temp <- datagenerator(10000, alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, option="VDTR")  
-  AUC(temp$marker[temp$disease==0], temp$marker[temp$disease==1])
-  a <- c(1:10)
-  for (i in 1:10){
-    temp.temp <- temp[(10000*(i-1)+1):(10000*i),]
-    a[i] <- AUC(temp.temp$marker[temp.temp$disease==0], temp.temp$marker[temp.temp$disease==1])
-  }
-  a
-  mean(a)
-}
-
-
-Sys.time(); AUC(temp$marker[temp$disease==0], temp$marker[temp$disease==1])
-
-#temp[,c("disease","diseaseR")]
-table(data.frame(disease=temp[,c("disease")], diseaseR=ifelse(is.na(temp$diseaseR),"NA",temp$disease)))
