@@ -19,7 +19,7 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
   n.x = length(x) ; n.y = length(y) ; n = n.x + n.y
   A = AUC(x, y, n.x, n.y)
   A.LT = logit(A, LT=LT)
-  start = c( max( A - 0.1, A/2), min( A + 0.1, (A+1)/2))
+  start = c( A/2, (A+1)/2)
   start.LT = logit(start, LT=LT)
   
   if (CI.method == "HM1") {
@@ -33,10 +33,17 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
     CI.LT = CI.base(A.LT,V.LT,alpha)
   }
   
-  else if (CI.method == "NS1") {
-    CI = multiroot(HMS.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, rtol = 1e-10, atol = 1e-10,...)$root  #original scale
+  else if (CI.method == "NS1" | CI.method == "NS2" ) {
+    NC = (CI.method == "NS2")
+    if (start[2]==1) {
+      ub = 1; start = start[1]
+      lb = multiroot2(HMS.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, NC=NC, rtol = 1e-10, atol = 1e-10,...)$root  #original scale    
+      CI = c(lb, ub)
+    } else {
+      CI = multiroot2(HMS.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, NC=NC, rtol = 1e-10, atol = 1e-10,...)$root  #original scale
+    }    
     CI.LT = logit(CI, LT=LT)
-    if (variance) {V.LT = V.HM(A, n.x, n.y, LT=LT,...)}
+    if (variance) {V.LT = V.HM(A, n.x, n.y, LT=LT, NC=NC,...)}
   }
   
   else if (CI.method == "NW") {
@@ -44,16 +51,6 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
     if (V.LT < 0) { warning("Negative estimated variance set to zero")
                  V.LT = 0 }
     CI.LT = CI.base(A.LT,V.LT,alpha)
-  }
-  
-  else if (CI.method == "NS2") {
-    CI = multiroot(NC.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, rtol = 1e-10, atol = 1e-10,...)$root
-    CI.LT = logit(CI, LT=LT)
-    if (variance) {
-      V.LT = V.NC(A, n.x, n.y, LT=LT,...)
-      if (V.LT < 0) { warning("Negative estimated variance set to zero")
-                   V.LT = 0 }      
-    }
   }
   
   else if (CI.method == "CM") {
@@ -77,7 +74,7 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
   }
 
   else if (CI.method == "Mee") {
-    CI = multiroot(Mee.equation, start, AUC.hat=A, x=x, y=y, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, rtol = 1e-10, atol = 1e-10,...)$root
+    CI = multiroot2(Mee.equation, start, AUC.hat=A, x=x, y=y, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, rtol = 1e-10, atol = 1e-10,...)$root
     CI.LT = logit(CI, LT=LT)
     if (variance) {
       V.LT=V.Mee(x, y, n.x=n.x, n.y=n.y, LT=LT,...) 
@@ -88,7 +85,7 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
     CI = DB(A, n.x, n.y, alpha, LT=LT,...)
     CI.LT = logit(CI, LT=LT)
     if (variance) {
-      alp = multiroot(DB.equation, c(1,3), AUC.hat=A, n.x=n.x, n.y=n.y, alpha=1,LT=LT)$root[1]
+      alp = multiroot2(DB.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=1,LT=LT)$root[1]
       V.LT = V.DB(alp, n.x, n.y, LT=LT)
     }
   }
@@ -97,7 +94,7 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
     CI = DG(A, n.x, n.y, alpha, LT=LT,...)
     CI.LT = logit(CI, LT=LT)
     if (variance) {
-      delta = multiroot(DG.equation, c(1,3), AUC.hat=A, n.x=n.x, n.y=n.y, alpha=1,LT=LT, rtol = 1e-10, atol = 1e-10,...)$root[1]
+      delta = multiroot2(DG.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=1,LT=LT, rtol = 1e-10, atol = 1e-10,...)$root[1]
       V.LT = V.DG(delta, n.x, n.y, LT=LT,...)
     }
   }

@@ -92,11 +92,11 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
     else if (CI.method %in% CI.Score) {
       start = c( max(mean.MI - 0.1, mean.MI/2), min(mean.MI + 0.1, (mean.MI+1)/2))
       if (CI.method == "NS1") {
-        CI = multiroot(HMS.equation, start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root}
+        CI = multiroot2(HMS.equation, start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root}
       else if (CI.method == "NS2"){
-        CI = multiroot(NC.equation,  start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root}  
+        CI = multiroot2(HMS.equation,  start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, NC=TRUE, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root}  
       else if (CI.method == "Mee") {
-        CI = multiroot(Mee.equation,  start, AUC.hat=mean.MI, x=x, y=y, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root
+        CI = multiroot2(Mee.equation,  start, AUC.hat=mean.MI, x=x, y=y, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root
       }
       CI.LT = logit(CI,LT=LT)
       if (variance) {
@@ -115,7 +115,7 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
         if (variance) {
           MI.DB = data.frame(alp = rep(NA, m), var = rep(NA, m))
           for (i in 1:m) {
-            MI.DB$alp[i] = multiroot(DB.equation, c(1,3), AUC.hat=mi.stat$theta[i], n.x=n.x, n.y=n.y, alpha=1 ,LT=LT, rtol = 1e-10, atol = 1e-10)$root[1]
+            MI.DB$alp[i] = multiroot2(DB.equation, c(1,3), AUC.hat=mi.stat$theta[i], n.x=n.x, n.y=n.y, alpha=1 ,LT=LT, rtol = 1e-10, atol = 1e-10)$root[1]
             MI.DB$var.LT[i] = V.DB(MI.DB$alp[i], n.x, n.y, LT=LT, ...)
           }
           Rubin = Rubin(W=mean(MI.DB$var.LT), MI=mi.stat$theta.LT, alpha=alpha)
@@ -129,7 +129,7 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
         if (variance) {
           MI.DG = data.frame(delta = rep(NA, m), var.LT = rep(NA, m))
           for (i in 1:m) {
-            MI.DG$delta[i] = multiroot(DG.equation, c(1,3), AUC.hat=mi.stat$theta[i], n.x=n.x, n.y=n.y, alpha=1,LT=LT, rtol = 1e-10, atol = 1e-10)$root[1]
+            MI.DG$delta[i] = multiroot2(DG.equation, c(1,3), AUC.hat=mi.stat$theta[i], n.x=n.x, n.y=n.y, alpha=1,LT=LT, rtol = 1e-10, atol = 1e-10)$root[1]
             MI.DG$var.LT[i] = V.DG(MI.DG$delta[i], n.x, n.y, LT=LT, ...)
           }
           Rubin = Rubin(W=mean(mi.stat$var.LT), MI=mi.stat$theta.LT, alpha=alpha)

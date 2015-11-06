@@ -93,60 +93,49 @@ Rubin = function(W, MI, alpha=0.05, print.r=FALSE, print.nu=FALSE) {
   return(result)
 }
 
+# rootSolve:::multiroot without error
+multiroot2 = function(f, start,..., silent=FALSE) {
+  tmp <- try(multiroot(f, start,...),silent=silent)
+  len <- length(start)
+  if (class(tmp)=="try-error") {result <- list(); result$root <- rep(NA,len)} else {result <- tmp}
+  return(result)
+}
+
+
 ## 1.1.2 variance estimators ###########################################################
 # Q.stat for HM and its derivatives
 Q.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   Q2 <- Q1 <- 0
-  for (i in 1:n.x) {Q1 = Q1 + ( sum(y > x[i]) + sum(y==x[i])/2 )^2}; Q1 = Q1 /(n.x * n.y^2)
-  for (j in 1:n.y) {Q2 = Q2 + ( sum(y[j] > x) + sum(y[j]==x)/2 )^2}; Q2 = Q2 /(n.x^2 * n.y)
+  for (i in 1:n.x) {Q1 = Q1 + ( sum(y > x[i]))^2}; Q1 = Q1 /(n.x * n.y^2)  # no ties
+  for (j in 1:n.y) {Q2 = Q2 + ( sum(y[j] > x))^2}; Q2 = Q2 /(n.x^2 * n.y)
   return(data.frame(Q1 = Q1, Q2 = Q2))
 }
-V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1), LT=FALSE, sample.var=TRUE, ...) {
+V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1), LT=FALSE, NC=FALSE, sample.var=TRUE, ...) {
   # default: HME method
+  N = (n.x+n.y)/2
   if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
   nxny = ifelse(sample.var, (n.x-1)*(n.y-1), n.x*n.y)  # sample.var: dividing by (nx-1)(ny-1) is unbiased
-  return((AUC * (1-AUC) + (n.y -1)*(Q1 - AUC^2) + (n.x-1)*(Q2 - AUC^2)) /nxny /div.LT )
+  if (NC==FALSE) {V = (AUC * (1-AUC) + (n.y -1)*(Q1 - AUC^2) + (n.x-1)*(Q2 - AUC^2)) /nxny /div.LT}
+  else {V = AUC*(1-AUC)/nxny * ( (2*N-1) - (3*N-3) / ((2-AUC)*(AUC+1)) )/div.LT}
+  return(V)
 }
 
 ### for score method it should be populatoin variance not sample variance (sample.var=FALSE).
-HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=FALSE, score.MI = "fixed.r") {
-  W = V.HM(AUC, n.x, n.y, LT=LT, sample.var=sample.var)
+HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, NC=FALSE, sample.var=FALSE, score.MI = "fixed.r") {
+  W = V.HM(AUC, n.x, n.y, LT=LT, NC=NC, sample.var=sample.var)
   if (score.MI == "fixed.r") {
     ## 1. fixed r
-    W.hat = V.HM(AUC.hat, n.x, n.y, LT=LT, sample.var=sample.var)
+    W.hat = V.HM(AUC.hat, n.x, n.y, LT=LT, NC=NC, sample.var=sample.var)
     Rubin = Rubin(W=W.hat, MI=MI, alpha=alpha, print.r=TRUE)
     z.val = Rubin$z.val       # nu is fixed (since r is fixed)
     r = Rubin$r
-    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(W*(1+r)) - logit(AUC.hat,LT=LT))  
+    return((logit(AUC,LT=LT) - min(10,logit(AUC.hat,LT=LT)))^2 - z.val^2*W*(1+r) )  
   } else if (score.MI == "fixed.B") {
     ## 2. fixed B hat
     Rubin = Rubin(W=W, MI=MI, alpha=alpha)
     V = Rubin$v.final         # W + (1/m)*B for MI
     z.val = Rubin$z.val       # t value for MI
-    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
-  }
-}
-
-V.NC <- function(AUC, n.x, n.y, LT=FALSE, sample.var=TRUE) {
-  N = (n.x+n.y)/2
-  nxny = ifelse(sample.var, (n.x-1)*(n.y-1), n.x*n.y)  # sample.var: dividing by (nx-1)(ny-1) is unbiased
-  if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
-  return( AUC*(1-AUC)/nxny * ( (2*N-1) - (3*N-3) / ((2-AUC)*(AUC+1)) )/div.LT )
-}
-NC.equation <- function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=TRUE, score.MI = "fixed.r") {
-  W = V.NC(AUC, n.x, n.y, LT=LT, sample.var=sample.var)
-  if (score.MI == "fixed.r") {
-    ## 1. fixed r
-    W.hat = V.NC(AUC.hat, n.x, n.y, LT=LT, sample.var=sample.var)
-    Rubin = Rubin(W=W.hat, MI=MI, alpha=alpha, print.r=TRUE)
-    z.val = Rubin$z.val       # nu is fixed (since r is fixed)
-    r = Rubin$r
-    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(W*(1+r)) - logit(AUC.hat,LT=LT))  
-  } else if (score.MI == "fixed.B") {
-    Rubin = Rubin(W=W, MI=MI, alpha=alpha)
-    V = Rubin$v.final         # W + (1/m)*B for MI
-    z.val = Rubin$z.val       # t value for MI
-    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
+    return((logit(AUC,LT=LT) - min(10,logit(AUC.hat,LT=LT)))^2 - z.val^2*V)
   }
 }
 V.CM <- function(AUC, n.x, n.y, LT=FALSE){
@@ -242,12 +231,12 @@ Mee.equation <- function(AUC, AUC.hat, x, y, n.x, n.y, alpha, MI=NA, LT=FALSE, s
     Rubin = Rubin(W=W.hat, MI=MI, alpha=alpha, print.r=TRUE)
     z.val = Rubin$z.val       # nu is fixed (since r is fixed)
     r = Rubin$r
-    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(W*(1+r)) - logit(AUC.hat,LT=LT))  
+    return((logit(AUC,LT=LT) - logit(AUC.hat,LT=LT))^2 - z.val^2*W*(1+r) )  
   } else if (score.MI == "fixed.B") {
     Rubin = Rubin(W=W, MI=MI, alpha=alpha)
     V = Rubin$v.final         # W + (1/m)*B for MI
     z.val = Rubin$z.val       # t value for MI
-    return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
+    return((logit(AUC,LT=LT) - logit(AUC.hat,LT=LT))^2 - z.val^2*V)
   }
 }
 V.DB <- function(alp, n.x, n.y, LT=FALSE) {
@@ -267,7 +256,10 @@ DB.equation <- function(alp, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE){
   return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
 }
 DB <- function(AUC.hat, n.x, n.y, alpha,...) {
-  alp <- multiroot(DB.equation, c(1,3), AUC.hat=AUC.hat, n.x=n.x, n.y=n.y, alpha=alpha,...)$root
+  start.1 <- min(3, max(-log(1-AUC.hat,2) - 1, 1))
+  start.2 <- min(7, -log(1-AUC.hat,2) + 1)
+  start <- c(start.1, start.2)
+  alp <- multiroot2(DB.equation, start, AUC.hat=AUC.hat, n.x=n.x, n.y=n.y, alpha=alpha,...)$root
   return(1 - gamma(alp + 1)^2 / gamma(2*alp + 1))
 }
 
@@ -286,7 +278,7 @@ DG.equation <- function(delta, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE) {
   return(logit(AUC,LT=LT) + c(+1,-1)*z.val*sqrt(V) - logit(AUC.hat,LT=LT))
 }
 DG <- function(AUC.hat, n.x, n.y, alpha,...) {
-  delta <- multiroot(DG.equation, c(0.5, 0.9), AUC.hat=AUC.hat, n.x=n.x, n.y=n.y, alpha=alpha,...)$root
+  delta <- multiroot2(DG.equation, c(0.5, 0.9), AUC.hat=AUC.hat, n.x=n.x, n.y=n.y, alpha=alpha,...)$root
   return(pnorm(delta/sqrt(2)))
 }
 S.stat <- function(x, y, n.x=length(x), n.y=length(y), A = AUC(x, y, n.x, n.y), LT=FALSE) {

@@ -15,53 +15,53 @@ SeSp <- function(data,
   R = data[,names[[4]]]
   DR = data[,names[[5]]]
   if (is.na(cutoff)) {CUTOFF=sort(T)} else {CUTOFF=cutoff}
-
   
-  expit = function(x) { exp(x) / (exp(x)+1) }
   SeSp.base = function(T, cutoff, weight.Se, weight.Sp) {
     Se = sum((T>=cutoff)*weight.Se)/sum(weight.Se)
     Sp = sum((T<cutoff)*weight.Sp)/sum(weight.Sp)
     return(c(cutoff, Se, Sp))
   }
   
-  if(CI.method=="full") {
-    result = data.frame(cutoff = NA, Se = NA, Sp = NA)
-    i=0; for (co in CUTOFF) {i = i+1; result[i,] = SeSp.base(T, co, D, 1-D)}
+  result = list()
+  
+  if("full" %in% CI.method) {
+    result[["full"]] = data.frame(cutoff = NA, Se = NA, Sp = NA)
+    i=0; for (co in CUTOFF) {i = i+1; result[["full"]][i,] = SeSp.base(T, co, D, 1-D)}
   }
   
-  else if(CI.method=="naive") {
-    result = data.frame(cutoff = NA, Se = NA, Sp = NA)
-    i=0; for (co in CUTOFF) {i = i+1; result[i,] = SeSp.base(T, co, D*(1-R), (1-D)*(1-R))}
+  if("naive" %in% CI.method) {
+    result[["naive"]] = data.frame(cutoff = NA, Se = NA, Sp = NA)
+    i=0; for (co in CUTOFF) {i = i+1; result[["naive"]][i,] = SeSp.base(T, co, D*(1-R), (1-D)*(1-R))}
   }
   
-  else if(CI.method=="BG") {
+  if("BG" %in% CI.method) {
     model = as.formula(paste(names[[5]], "~", names[[2]], "*(", paste(names[[3]],collapse="+"), ")" ))
     PrD = glm(model, binomial, data=data, na.action=na.omit); PrDi = expit(predict(PrD,data))
-    result = data.frame(cutoff = NA, Se = NA, Sp = NA)
-    i=0; for (co in CUTOFF) {i = i+1; result[i,] = SeSp.base(T, co, PrDi, 1-PrDi)}
+    result[["BG"]] = data.frame(cutoff = NA, Se = NA, Sp = NA)
+    i=0; for (co in CUTOFF) {i = i+1; result[["BG"]][i,] = SeSp.base(T, co, PrDi, 1-PrDi)}
   }
   
-  else if(CI.method=="MS") {
+  if("MS" %in% CI.method) {
     model = as.formula(paste(names[[5]], "~", names[[2]], "*(", paste(names[[3]],collapse="+"), ")" ))
     PrD = glm(model, binomial, data=data, na.action=na.omit); PrDi = expit(predict(PrD,data))
-    result = data.frame(cutoff = NA, Se = NA, Sp = NA)
-    i=0; for (co in CUTOFF) {i = i+1; result[i,] = SeSp.base(T, co, ((1-R)*D + R*PrDi), ((1-R)*(1-D) + R*(1-PrDi)))}
+    result[["MS"]] = data.frame(cutoff = NA, Se = NA, Sp = NA)
+    i=0; for (co in CUTOFF) {i = i+1; result[["MS"]][i,] = SeSp.base(T, co, ((1-R)*D + R*PrDi), ((1-R)*(1-D) + R*(1-PrDi)))}
   }  
   
-  else if(CI.method=="IPW") {
+  if("IPW" %in% CI.method) {
     model = as.formula(paste("1-",names[[4]], "~", names[[2]], "*(", paste(names[[3]],collapse="+"), ")" ))
     PrR0 = glm(model, binomial, data=data); Pii = expit(predict(PrR0,data)) # Pii = Pr(R=0)
-    result = data.frame(cutoff = NA, Se = NA, Sp = NA)
-    i=0; for (co in CUTOFF) {i = i+1; result[i,] = SeSp.base(T, co, (1-R)*D*Pii^(-1), (1-R)*(1-D)*Pii^(-1))}
+    result[["IPW"]] = data.frame(cutoff = NA, Se = NA, Sp = NA)
+    i=0; for (co in CUTOFF) {i = i+1; result[["IPW"]][i,] = SeSp.base(T, co, (1-R)*D*Pii^(-1), (1-R)*(1-D)*Pii^(-1))}
   } 
 
-  else if(CI.method=="SP") {
+  if("SP" %in% CI.method) {
     model1 = as.formula(paste(names[[5]], "~", names[[2]], "*(", paste(names[[3]],collapse="+"), ")" ))
     model2 = as.formula(paste("1-",names[[4]], "~", names[[2]], "*(", paste(names[[3]],collapse="+"), ")" ))
     PrD = glm(model1, binomial, data=data, na.action=na.omit); PrDi = expit(predict(PrD, data))
     PrR0 = glm(model2, binomial, data=data); Pii = expit(predict(PrR0, data)) # Pii = Pr(R=0)
-    result = data.frame(cutoff = NA, Se = NA, Sp = NA)
-    i=0; for (co in CUTOFF) {i = i+1; result[i,] = SeSp.base(T, co, ((1-R)*D + (Pii-1+R)*PrDi)*Pii^(-1), ((1-R)*(1-D) + (Pii-1+R)*(1-PrDi))*Pii^(-1))}
+    result[["SP"]] = data.frame(cutoff = NA, Se = NA, Sp = NA)
+    i=0; for (co in CUTOFF) {i = i+1; result[["SP"]][i,] = SeSp.base(T, co, ((1-R)*D + (Pii-1+R)*PrDi)*Pii^(-1), ((1-R)*(1-D) + (Pii-1+R)*(1-PrDi))*Pii^(-1))}
   }
   
   return(result)
@@ -69,9 +69,16 @@ SeSp <- function(data,
 
 ## 1.3.2 SeSp to AUC function ###########################################################  
 SeSp2AUC = function(data) {
-  Se <- c(data$Se,0)
-  d.Sp <- c(data$Sp,1) - c(0, data$Sp)
-  return(sum(Se*d.Sp))
+  if (class(data) != "list") {stop("Data is not a list")}
+  len = length(data)
+  result = data.frame(t(rep(NA,len)))
+  colnames(result) <- names(data)
+  for (i in 1:len){
+    Se <- c(data[[i]]$Se,0)
+    d.Sp <- c(data[[i]]$Sp,1) - c(0, data[[i]]$Sp)
+    result[,i] = sum(Se*d.Sp)
+  }
+  return(result)
 }
 
 #### 1.3.3 AUC.verif  ###################################################################  
@@ -79,10 +86,10 @@ SeSp2AUC = function(data) {
 AUC.verif <- function(data,
                       names = list("disease", "marker", c("V.1", "V.2", "V.3", "V.4", "V.5"), "R", "diseaseR"), 
                       CI.method, cutoff=NA) {
-  if (CI.method %in% c("full", "naive", "BG", "MS", "IPW", "SP")) {
-    return(SeSp2AUC(SeSp(data,,CI.method=CI.method)))
-  }
-  else if (CI.method=="He") {
+  len = length(CI.method)
+  CI.SeSp = CI.method[CI.method %in% c("full", "naive", "BG", "MS", "IPW", "SP")]
+  if (length(CI.SeSp)>0) {result = SeSp2AUC(SeSp(data,,CI.method=CI.SeSp))} else {result = data.frame(He=NA)}
+  if ("He" %in% CI.method) {
     model = as.formula(paste("1-",names[[4]], "~", names[[2]], "*(", paste(names[[3]],collapse="+"), ")" ))
     PrR0 = glm(model, binomial, data=data); Pii = expit(predict(PrR0, data)) # Pii = Pr(R=0)
     marker.y = data[data$disease==1 & data$R==0, names[[2]]]
@@ -94,6 +101,7 @@ AUC.verif <- function(data,
       A <- 0; for (i in 1:n.x) { A = A + ( (marker.y > marker.x[i]) %*% (Pii.y^(-1)) * Pii.x[i]^(-1) + ((marker.y == marker.x[i])/2) %*% (Pii.y^(-1)) * Pii.x[i]^(-1) )  }
       A = A/ sum(Pii.x^(-1)) / sum(Pii.y^(-1))      
     }
-    return(A[1])
-  }   
+    result$He = A[1]
+  }
+  return(result)
 }
