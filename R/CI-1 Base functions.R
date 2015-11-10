@@ -34,9 +34,9 @@ AUC.classic <- function(x, y, n.x=length(x), n.y=length(y)) {
   return(A = A/ n.x / n.y)
 }
 # new AUC function added with much improved efficiency
-AUC <- function(x, y, n.x=length(x), n.y=length(y), data=NA) {
+AUC <- function(x, y, n.x=length(x), n.y=length(y), data=NA, disease="disease", marker="marker") {
   if (!is.na(data[1])[1]) {
-    xy = data2xy(data)
+    xy = data2xy(data, disease=disease, marker=marker)
     x = xy$x
     y = xy$y
   }
@@ -74,7 +74,7 @@ expit <- function(data, LT=TRUE) {
 
 # variance estimator for multiple imputation
 Rubin = function(W, MI, alpha=0.05, print.r=FALSE, print.nu=FALSE) {
-  if (is.na(MI[1])) {
+  if (is.na(MI[1])) {     # in case it is not Multiple imputation, bypass Rubin!
     v.final = W
     z.val=qnorm(1-alpha/2)
     r = 0
@@ -216,14 +216,14 @@ Mee.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   N.J.hat = n.x*n.y/(((n.x-1)*rho.hat$p1 +1)/(1-1/n.y) + ((n.y-1)*rho.hat$p2 + 1 )/(1-1/n.x) )
   return(data.frame(AUC.hat=AUC.hat.0, p1=p$p1, p2=p$p2, N.J.hat=N.J.hat))
 }
-V.Mee <- function(x, y, n.x=length(x), n.y=length(y), AUC=AUC(x,y,n.x,n.y), LT=FALSE, sample.var=TRUE) {
+V.Mee.old <- function(x, y, n.x=length(x), n.y=length(y), AUC=AUC(x,y,n.x,n.y), LT=FALSE, N.J.hat=NA, sample.var=TRUE) {
   # sample.var is not relevant. for compatibility purpose. (V.Mee is upward biased)
-  N.J.hat = Mee.stat(x,y,n.x,n.y)$N.J.hat
+  if (is.na(N.J.hat)) {N.J.hat = Mee.stat(x,y,n.x,n.y)$N.J.hat}
   V = AUC*(1-AUC) / N.J.hat
   if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
   return( V/div.LT )
 }
-Mee.equation <- function(AUC, AUC.hat, x, y, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=TRUE, score.MI = "fixed.r"){
+Mee.equation.old <- function(AUC, AUC.hat, x, y, n.x, n.y, alpha, MI=NA, LT=FALSE, sample.var=TRUE, score.MI = "fixed.r"){
   W = V.Mee(x, y, n.x, n.y, AUC, LT=LT, sample.var=sample.var)
   if (score.MI == "fixed.r") {
     ## 1. fixed r
@@ -239,6 +239,30 @@ Mee.equation <- function(AUC, AUC.hat, x, y, n.x, n.y, alpha, MI=NA, LT=FALSE, s
     return((logit(AUC,LT=LT) - logit(AUC.hat,LT=LT))^2 - z.val^2*V)
   }
 }
+
+V.Mee <- function(AUC, N.J.hat, LT=FALSE, sample.var=TRUE) {
+  # sample.var is not relevant. for compatibility purpose. (V.Mee is upward biased)
+  V = AUC*(1-AUC) / N.J.hat
+  if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
+  return( V/div.LT )
+}
+Mee.equation <- function(AUC, AUC.hat, N.J.hat, alpha, MI=NA, LT=FALSE, sample.var=TRUE, score.MI = "fixed.r"){
+  W = V.Mee(AUC, N.J.hat, LT=LT, sample.var=sample.var)
+  if (score.MI == "fixed.r") {
+    ## 1. fixed r
+    W.hat = V.Mee(AUC.hat, N.J.hat, LT=LT, sample.var=sample.var)
+    Rubin = Rubin(W=W.hat, MI=MI, alpha=alpha, print.r=TRUE)
+    z.val = Rubin$z.val       # nu is fixed (since r is fixed)
+    r = Rubin$r
+    return((logit(AUC,LT=LT) - logit(AUC.hat,LT=LT))^2 - z.val^2*W*(1+r) )  
+  } else if (score.MI == "fixed.B") {
+    Rubin = Rubin(W=W, N.J.hat, MI=MI, alpha=alpha)
+    V = Rubin$v.final         # W + (1/m)*B for MI
+    z.val = Rubin$z.val       # t value for MI
+    return((logit(AUC,LT=LT) - logit(AUC.hat,LT=LT))^2 - z.val^2*V)
+  }
+}
+
 V.DB <- function(alp, n.x, n.y, LT=FALSE) {
   R1 = gamma(alp + 1)^2 / gamma(2*alp + 1)
   R2 = gamma(2*alp +1)*gamma(alp +1)/gamma(3*alp+1)

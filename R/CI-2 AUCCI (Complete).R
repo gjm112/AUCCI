@@ -24,7 +24,7 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
   
   if (CI.method == "HM1") {
     Q = Q.stat(x, y, n.x, n.y); Q1 = Q$Q1; Q2 = Q$Q2
-    V.LT = V.HM(A, n.x, n.y, Q1, Q2,LT=LT,...)
+    V.LT = V.HM(A, n.x, n.y, Q1, Q2, LT=LT,...)
     CI.LT = CI.base(A.LT,V.LT,alpha)
   } 
   
@@ -47,10 +47,17 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
   }
   
   else if (CI.method == "NW") {
-    V.LT = V.NC(A, n.x, n.y, LT=LT,...)
-    if (V.LT < 0) { warning("Negative estimated variance set to zero")
-                 V.LT = 0 }
-    CI.LT = CI.base(A.LT,V.LT,alpha)
+    V.LT = V.HM(A, n.x, n.y, NC=TRUE, LT=LT,...)
+    if (is.na(V.LT)) {
+      warning("Variance unestimable, the number of diseased or nondiseased subjects is less than or equal to one")
+      CI.LT = c(NaN, NaN)
+    } else {
+      if (V.LT < 0) { 
+        warning("Negative estimated variance set to zero")
+        V.LT = 0
+      }
+      CI.LT = CI.base(A.LT,V.LT,alpha)
+    }
   }
   
   else if (CI.method == "CM") {
@@ -74,7 +81,8 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
   }
 
   else if (CI.method == "Mee") {
-    CI = multiroot2(Mee.equation, start, AUC.hat=A, x=x, y=y, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, rtol = 1e-10, atol = 1e-10,...)$root
+    N.J.hat = Mee.stat(x, y, n.x, n.y)$N.J.hat
+    CI = multiroot2(Mee.equation, start, AUC.hat=A, N.J.hat=N.J.hat, alpha=alpha, LT=LT, rtol = 1e-10, atol = 1e-10,...)$root
     CI.LT = logit(CI, LT=LT)
     if (variance) {
       V.LT=V.Mee(x, y, n.x=n.x, n.y=n.y, LT=LT,...) 

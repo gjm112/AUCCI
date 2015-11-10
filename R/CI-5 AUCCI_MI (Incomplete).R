@@ -56,12 +56,18 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
   ### B. Inference stage: point estimate
   {
     mi.stat = data.frame(theta = rep(NA, m), var = rep(NA, m))
+    n.x.vec = rep(NA, m)
     for (i in 1:m) {
       temp = data2xy(data.comp[[i]],disease="diseaseR", marker="marker")
       x = temp$x ; y = temp$y
       mi.stat$theta[i] = AUC(x, y)
+      n.x.vec[i] = length(x)
+      if ("Mee" %in% CI.method) {
+        mi.stat$N.J.hat[i] = Mee.stat(x, y)$N.J.hat
+      }
     }
-    n.x = length(x); n.y = length(y); n = n.x + n.y
+    n = dim(data.comp[[1]])[1]
+    n.x = round(mean(n.x.vec, na.rm=TRUE));    n.y = n - n.x
     mi.stat$theta.LT = logit(mi.stat$theta,LT=LT)
     mi.stat$div.LT = ifelse(LT,(mi.stat$theta[i]*(1-mi.stat$theta[i]))^2,1)
     mean.MI = mean(mi.stat$theta)
@@ -82,7 +88,7 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
       for (i in 1:m) {
         mi.stat$var.LT[i] = AUCCI(data.comp[[i]], CI.method=CI.method, disease="diseaseR", alpha=alpha, variance = TRUE, LT=LT, ...)$V.hat
       }
-      Rubin = Rubin(W=mean(mi.stat$var.LT), MI=mi.stat$theta.LT, alpha=alpha, print.nu = TRUE)
+      Rubin = Rubin(W=mean(mi.stat$var.LT, na.rm=TRUE), MI=mi.stat$theta.LT, alpha=alpha, print.nu = TRUE)
       var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
       nu.LT = Rubin$nu             # degree of freedom for MI
       CI.LT = CI.base(mean.MI.LT, var.MI.LT, alpha, qt, df=nu.LT)    # logit scale (will back-transform in the end)
@@ -90,13 +96,13 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
     }
     
     else if (CI.method %in% CI.Score) {
-      start = c( max(mean.MI - 0.1, mean.MI/2), min(mean.MI + 0.1, (mean.MI+1)/2))
+      start = c( (mean.MI+.5)/2, (mean.MI+1)/2)
       if (CI.method == "NS1") {
         CI = multiroot2(HMS.equation, start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root}
-      else if (CI.method == "NS2"){
+      else if (CI.method == "NS2") {
         CI = multiroot2(HMS.equation,  start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, NC=TRUE, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root}  
       else if (CI.method == "Mee") {
-        CI = multiroot2(Mee.equation,  start, AUC.hat=mean.MI, x=x, y=y, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root
+        CI = multiroot2(Mee.equation,  start, AUC.hat=mean.MI, N.J.hat = mean(mi.stat$N.J.hat, na.rm=TRUE), alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root
       }
       CI.LT = logit(CI,LT=LT)
       if (variance) {
