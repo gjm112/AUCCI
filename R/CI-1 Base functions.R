@@ -93,6 +93,8 @@ Rubin = function(W, MI, alpha=0.05, print.r=FALSE, print.nu=FALSE) {
   return(result)
 }
 
+
+# Handling errors
 # rootSolve:::multiroot without error
 multiroot2 = function(f, start,..., silent=FALSE) {
   tmp <- try(multiroot(f, start,...),silent=silent)
@@ -100,6 +102,15 @@ multiroot2 = function(f, start,..., silent=FALSE) {
   if (class(tmp)=="try-error") {result <- list(); result$root <- rep(NA,len)} else {result <- tmp}
   return(result)
 }
+# mice without error
+mice2 = function(data, m = 5, ..., silent=FALSE) {
+  tmp <- try(mice(data = data, m = m, ...),silent=silent)
+  if (class(tmp)=="try-error") {
+    result <- "error"} else {result <- tmp}
+  return(result)
+}
+
+
 
 
 ## 1.1.2 variance estimators ###########################################################

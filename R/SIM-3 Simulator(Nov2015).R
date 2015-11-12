@@ -62,13 +62,13 @@ R = 30
 ## 2.3.2 Simulator #######################################################################
 
 ## 2.3.2.1 Simulation package (Data generation + Inference + Evaluation)  ################
-n.sim=10000
+n.sim=1000
 { 
   set.seed(100)
   bgn <- Sys.time()
   # setting dimensions and seed
   d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n); set.seed = 50
-  d1 = 3:6
+  d1 = 4:6
   
   ## steps
   imputation=TRUE    # run MI and estimates?
@@ -148,16 +148,21 @@ n.sim=10000
             temp.MI <- list()
             for (l in MI.methods[,"methods"]) {
               # pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d123," (MI-",l,")|"), style=3)
-              nonestimable.pmm = FALSE
+              nonestimable.pmm <- nonestimable <- FALSE
               if (l == "pmm" |l == "logreg") { 
                 if (l == "pmm" & all(temp$diseaseR[!is.na(temp$diseaseR)] == 1)) {
                   # when every obs are 1's or 0's pmm cannot impute
                   nonestimable.pmm = TRUE
                 } else {
-                  temp.imp <- mice(data=temp, method=l, m=m, predictorMatrix=cbind(0,(1 - diag(1, ncol(temp)))[,-1]), printFlag=FALSE)
-                  temp.comp <- list()
-                  for (q in 1:m) {temp.comp[[q]] = complete(temp.imp, action = q)[,c("diseaseR", "marker")]}
-                  temp.MI[[l]] = temp.comp                  
+                  temp.imp <- mice2(data=temp, method=l, m=m, predictorMatrix=cbind(0,(1 - diag(1, ncol(temp)))[,-1]), printFlag=FALSE)
+                  if (temp.imp == "error") {
+                    temp.MI[[l]] = vector("list", m)
+                    nonestimable = TRUE
+                  } else {
+                    temp.comp <- list()
+                    for (q in 1:m) {temp.comp[[q]] = complete(temp.imp, action = q)[,c("diseaseR", "marker")]}
+                    temp.MI[[l]] = temp.comp                    
+                  }
                 }
               }
               else if (l == "imp.norm") {
@@ -172,7 +177,7 @@ n.sim=10000
               # pb <- txtProgressBar(min=0, max = n.sim*3, char = paste0(((i-1)*2+j-1)*3+h, "/",d123," (Est.MI-",l,")|"), style=3)
               # l.index = which(l ==MI.methods[,"methods"] )
               # setTxtProgressBar(pb,k + (l.index-1)*n.sim)
-              if (nonestimable.pmm == TRUE) {
+              if (nonestimable.pmm == TRUE | nonestimable == TRUE) {
                 temp.estMI[[l]][k,] <- NA
               } else {
                 temp.estMI[[l]][k,] <- CI.i(temp.MI[[l]], fun=AUCCI.MI, CI.method=CI.methods, m=m, alpha=alpha, type="landscape2")
@@ -223,7 +228,7 @@ n.sim=10000
         print(paste0("bgn: ", format(bgn,"%m/%d %H:%M"), ", elapsed: ", round(elapsed,1), " min's, expected: ", format(expected,"%m/%d %H:%M"), ", i: ", paste(i,"in", length(d1)), ", j: ", paste(j,"in", length(d2)), ", h: ", paste(h,"in", length(d3)) ))
       
       } # h in d3
-      saveRDS(temp.d3, paste0("sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
+      saveRDS(temp.d3, paste0("sim_data-1k-","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
       temp.d2[[j]] <- temp.d3
       
     } # j in d2
