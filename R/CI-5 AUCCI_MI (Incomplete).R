@@ -2,21 +2,14 @@
 ## 1-5 [CI] AUCCI_MI(Incomplete):  1.5.1 AUCCI.MI
 
 # Library ##############################################################################
-library(mice)       # for Multiple Imputation
-library(norm)         # for Multiple Imputation
+# [package] mice, norm, [functoins] mice2, adp.norm, MI.norm are required: CI-1b.auxillary functions.R
 
 # needs functions: AUC, data2xy, AUCCI, HMS.equation
 
 # MI methods
-MI.methods = data.frame(functions=c(rep("mice",2),rep("norm",1)), methods=c("pmm","logreg","imp.norm"))
+MI.methods = data.frame(functions=c(rep("mice2",2),rep("MI.norm",3)), methods=c("pmm","logreg","simple","coinflip","adaptive"))
 ########################################################################################
 
-MI.norm <- function(data) {
-  data.mat <- data.matrix(data)
-  s <- prelim.norm(data.mat)
-  mle <- em.norm(s)
-  imp.norm(s = s, theta = mle, x = data.mat)
-}
 
 ## 1.5.1 AUCCI.MI ##################################################################### 
 # For score types DO NOT use LT!!! very unstable for theta near 1
@@ -39,13 +32,10 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
     # 2. when multiple imutation needs to be done for a dataframe
     # For convenience of one-time CI construction. Very unefficient for large size of simulation
     else if (class(data) == "data.frame") {
-      if (identical(MI.function, mice)) {
-        data.imp <- MI.function(data=data, method=MI.method, m=m, predictorMatrix=cbind(0,(1 - diag(1, ncol(data)))[,-1]), printFlag=FALSE,...)
-        data.comp <- list()
-        for (i in 1:m) {data.comp[[i]] = complete(data.imp, action = i)[,c("diseaseR", "marker")]}
-      } else if (identical(MI.function, norm)) {
-        #######  "TBD"  
-        
+      if (identical(MI.function, mice2)) {
+        data.comp <- MI.function(data=data[,-1], method=MI.method, m=m, printFlag=FALSE,...)
+      } else if (identical(MI.function, MI.norm)) {
+        data.comp <- MI.function(data=data[,-1], rounding=MI.method, m=m, showits=FALSE,...)
       }
     }
     
@@ -67,7 +57,9 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
       }
     }
     n = dim(data.comp[[1]])[1]
-    n.x = round(mean(n.x.vec, na.rm=TRUE));    n.y = n - n.x
+    n.x = round(mean(n.x.vec, na.rm=TRUE))
+      if (n.x <= 1 & mean(n.x.vec, na.rm=TRUE) >1) {n.x <- 2} # if n.x is 1, variance is not estimable.
+    n.y = n - n.x
     mi.stat$theta.LT = logit(mi.stat$theta,LT=LT)
     mi.stat$div.LT = ifelse(LT,(mi.stat$theta[i]*(1-mi.stat$theta[i]))^2,1)
     mean.MI = mean(mi.stat$theta)
@@ -83,27 +75,50 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
     CI.Score = c("NS1", "NS2", "Mee")
     CI.root = c("DB", "DG")
     CI.other = c("RG")
-    
     if (CI.method %in% CI.Wald) {
       for (i in 1:m) {
         mi.stat$var.LT[i] = AUCCI(data.comp[[i]], CI.method=CI.method, disease="diseaseR", alpha=alpha, variance = TRUE, LT=LT, ...)$V.hat
       }
-      Rubin = Rubin(W=mean(mi.stat$var.LT, na.rm=TRUE), MI=mi.stat$theta.LT, alpha=alpha, print.nu = TRUE)
-      var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
-      nu.LT = Rubin$nu             # degree of freedom for MI
-      CI.LT = CI.base(mean.MI.LT, var.MI.LT, alpha, qt, df=nu.LT)    # logit scale (will back-transform in the end)
-      CI = expit(CI.LT, LT=LT)
+      # when there is only one 0 or 1, V will be Inf (actually it's not inf, but nonestimable. So eliminate them when averaging.)
+      mi.var.fin = mi.stat$var.LT[is.finite(mi.stat$var.LT)]
+      # If every MI cases has unestimable variance(NA or Inf), Wald type CI can not be gotten.
+      if (length(mi.var.fin) > 0) {
+        Rubin = Rubin(W=mean(mi.var.fin), MI=mi.stat$theta.LT, alpha=alpha, print.nu = TRUE)
+        var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
+        nu.LT = Rubin$nu             # degree of freedom for MI
+        if (is.na(nu.LT) & var.MI.LT==0) {nu.LT=Inf}
+        CI.LT = CI.base(mean.MI.LT, var.MI.LT, alpha, qt, df=nu.LT)    # logit scale (will back-transform in the end)
+        CI = expit(CI.LT, LT=LT)
+      } else {
+        CI.LT <- CI <- c(NA,NA)
+      }
     }
     
     else if (CI.method %in% CI.Score) {
       start = c( (mean.MI+.5)/2, (mean.MI+1)/2)
-      if (CI.method == "NS1") {
-        CI = multiroot2(HMS.equation, start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root}
-      else if (CI.method == "NS2") {
-        CI = multiroot2(HMS.equation,  start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, NC=TRUE, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root}  
-      else if (CI.method == "Mee") {
-        CI = multiroot2(Mee.equation,  start, AUC.hat=mean.MI, N.J.hat = mean(mi.stat$N.J.hat, na.rm=TRUE), alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root
+      start = mean.MI + c(-1,+1)*qnorm(1-alpha/2)*sqrt(mean.MI*(1-mean.MI)/n.x/n.y)
+      if (score.MI == "fixed.r" & LT==FALSE) {  #if n.x==1, var is not estimable, make it population var to estimate r.
+        W = V.HM(AUC=mean.MI, n.x=n.x, n.y=n.y, LT=LT, NC=FALSE, sample.var=ifelse(n.x==1,FALSE,TRUE))
+        r = Rubin(W=W, MI=mi.stat$theta.LT, alpha=alpha, print.r=TRUE)$r
+        if (all(mi.stat$theta.LT==1)) {r=1}  #if all theta_(i)'s are 1, W=0, r=undefined, V=0
+        if (CI.method == "NS1") {
+          CI = polyroot2(HM.coef,AUC.hat=mean.MI, n.x=n.x, n.y=n.y, NC=FALSE, alpha=alpha, r=r)
+        } else if (CI.method == "NS2") {
+          CI = polyroot2(HM.coef,AUC.hat=mean.MI, n.x=n.x, n.y=n.y, NC=TRUE, alpha=alpha, r=r)
+        } else if (CI.method == "Mee") {
+          CI = polyroot2(Mee.coef,AUC.hat=mean.MI, N.J.hat=mean(mi.stat$N.J.hat, na.rm=TRUE), alpha=alpha, r=r)
+        }
       }
+      else {
+        if (CI.method == "NS1") {
+          CI = multiroot2(HMS.equation, start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root    
+        } else if (CI.method == "NS2") {
+          CI = multiroot2(HMS.equation,  start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, NC=TRUE, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root 
+        } else if (CI.method == "Mee") {
+          CI = multiroot2(Mee.equation,  start, AUC.hat=mean.MI, N.J.hat = mean(mi.stat$N.J.hat, na.rm=TRUE), alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root
+        }
+      }
+      
       CI.LT = logit(CI,LT=LT)
       if (variance) {
         for (i in 1:m) {

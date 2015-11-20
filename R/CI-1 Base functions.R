@@ -72,47 +72,6 @@ expit <- function(data, LT=TRUE) {
   if (LT) {return((1+exp(data)^-1)^-1)} else {return(data)}
 }
 
-# variance estimator for multiple imputation
-Rubin = function(W, MI, alpha=0.05, print.r=FALSE, print.nu=FALSE) {
-  if (is.na(MI[1])) {     # in case it is not Multiple imputation, bypass Rubin!
-    v.final = W
-    z.val=qnorm(1-alpha/2)
-    r = 0
-    nu = NA
-  } else {
-    m = length(MI)
-    B = var(MI)
-    v.final = W + B*(1+1/m)
-    r = v.final / W  - 1   # missing ratio
-    nu = (m-1)*(1+1/r)
-    z.val = qt(1-alpha/2, nu)
-  }
-  result = data.frame(v.final=v.final, z.val=z.val)
-  if (print.r) {result$r = r}
-  if (print.nu) {result$nu = nu}
-  return(result)
-}
-
-
-# Handling errors
-# rootSolve:::multiroot without error
-multiroot2 = function(f, start,..., silent=FALSE) {
-  tmp <- try(multiroot(f, start,...),silent=silent)
-  len <- length(start)
-  if (class(tmp)=="try-error") {result <- list(); result$root <- rep(NA,len)} else {result <- tmp}
-  return(result)
-}
-# mice without error
-mice2 = function(data, m = 5, ..., silent=FALSE) {
-  tmp <- try(mice(data = data, m = m, ...),silent=silent)
-  if (class(tmp)=="try-error") {
-    result <- "error"} else {result <- tmp}
-  return(result)
-}
-
-
-
-
 ## 1.1.2 variance estimators ###########################################################
 # Q.stat for HM and its derivatives
 Q.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
@@ -149,6 +108,18 @@ HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, NC=FALSE
     return((logit(AUC,LT=LT) - min(10,logit(AUC.hat,LT=LT)))^2 - z.val^2*V)
   }
 }
+HM.coef = function(AUC.hat, n.x, n.y, NC=FALSE, alpha, r=0){   #coefficients of expanded equation to be solved by to polyroot
+  if (NC==FALSE) {n.x0 = n.x; n.y0 = n.y}
+  else {n.x0 <- n.y0 <- (n.x+n.y)/2}
+  z = qnorm(1-alpha/2)
+  t4 = (n.x0 + n.y0 -1)*(1+r)*z^2 + 1*n.x*n.y
+  t3 = (-3*n.x0 -n.y0 +2)*(1+r)*z^2 +(-2 *AUC.hat -1)*n.x*n.y
+  t2 = (2*n.x0 -n.y0 -2)*(1+r)*z^2 + (AUC.hat^2 + 2*AUC.hat -2)*n.x*n.y
+  t1 = (n.y0 +1)*(1+r)*z^2 +(-AUC.hat^2 + 4*AUC.hat)*n.x*n.y
+  t0 = -2*AUC.hat^2*n.x*n.y
+  return(c(t0, t1, t2, t3, t4))
+}
+
 V.CM <- function(AUC, n.x, n.y, LT=FALSE){
   z1 = function (w, n.x, n.y, k) {1-0.5*(w/n.y+(k-w)/n.x)}
   z2 = function (w, n.x, n.y, k) 
@@ -175,7 +146,7 @@ probit.RG <- function(x, y, n.x=length(x), n.y=length(y)){
   return(data.frame(delta=d, V=V))
 }
 
-V.Bm <- function(x, y, n.x=length(x), n.y=length(y), AUC.hat=AUC(x,y,n.x,n.y), LT=FALSE, sample.var=TRUE){
+V.Bm.old <- function(x, y, n.x=length(x), n.y=length(y), AUC.hat=AUC(x,y,n.x,n.y), LT=FALSE, sample.var=TRUE){
   b.yyx <- b.xxy <- p.xy <- 0
   for (i in 1:n.x) {b.yyx = b.yyx + sum(y < x[i])^2 + sum(x[i] < y)^2 -2*sum(y < x[i])*sum(x[i] < y) }
   b.yyx = b.yyx/(n.x*n.y^2)
@@ -187,6 +158,20 @@ V.Bm <- function(x, y, n.x=length(x), n.y=length(y), AUC.hat=AUC(x,y,n.x,n.y), L
   if (LT) {div.LT = (AUC.hat*(1-AUC.hat))^2} else {div.LT=1}
   return(1/(4*nxny)*(p.xy + (n.y -1)*b.xxy + (n.x -1)*b.yyx - 4*(n.y + n.x -1)*(AUC.hat -0.5)^2)/div.LT)
 }
+## replaced V.Bm.old with new one to reflect "calculating b-stats without replacement"
+V.Bm <- function(x, y, n.x=length(x), n.y=length(y), AUC.hat=AUC(x,y,n.x,n.y), LT=FALSE, sample.var=TRUE){
+  b.yyx <- b.xxy <- p.xy <- 0
+  for (i in 1:n.x) {b.yyx = b.yyx + sum(y < x[i])*{sum(y < x[i])-1} + sum(x[i] < y)*{sum(x[i] < y)-1} -2*sum(y < x[i])*sum(x[i] < y) }
+  b.yyx = b.yyx/(n.x*n.y*(n.y-1))
+  for (j in 1:n.y) {b.xxy = b.xxy + sum(x < y[j])*{sum(x < y[j])-1} + sum(y[j] < x)*{sum(y[j] < x)-1} -2*sum(x < y[j])*sum(y[j] < x) }
+  b.xxy = b.xxy/(n.y*n.x*(n.x-1))
+  for (i in 1:n.x) {  p.xy = p.xy + sum(y != x[i] ) }
+  p.xy = p.xy /(n.x*n.y)
+  nxny = ifelse(sample.var, (n.x-1)*(n.y-1), n.x*n.y)  # sample.var: dividing by (nx-1)(ny-1) is unbiased
+  if (LT) {div.LT = (AUC.hat*(1-AUC.hat))^2} else {div.LT=1}
+  return(1/(4*nxny)*(p.xy + (n.y -1)*b.xxy + (n.x -1)*b.yyx - 4*(n.y + n.x -1)*(AUC.hat -0.5)^2)/div.LT)
+}
+
 # p.stat for Halperin Mee method
 p.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   Q = Q.stat(x, y, n.x, n.y); Q1 <- Q$Q1;  Q2 <- Q$Q2
@@ -272,6 +257,13 @@ Mee.equation <- function(AUC, AUC.hat, N.J.hat, alpha, MI=NA, LT=FALSE, sample.v
     z.val = Rubin$z.val       # t value for MI
     return((logit(AUC,LT=LT) - logit(AUC.hat,LT=LT))^2 - z.val^2*V)
   }
+}
+Mee.coef = function(AUC.hat, N.J.hat, alpha, r=0){    #coefficients of expanded equation to be solved by to polyroot
+  z = qnorm(1-alpha/2)
+  t2 = (1+r)*z^2 + N.J.hat
+  t1 = -(1+r)*z^2 + -2*AUC.hat*N.J.hat
+  t0 = AUC.hat^2 * N.J.hat
+  return(c(t0, t1, t2))
 }
 
 V.DB <- function(alp, n.x, n.y, LT=FALSE) {
