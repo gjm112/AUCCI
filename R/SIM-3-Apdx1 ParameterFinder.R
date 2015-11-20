@@ -5,7 +5,7 @@
 #requires MASS, AUC, datagenerator
 #########################################
 
-param.finder = function(param = "beta1", start, target, digit = 1, target.digit=5, tolerance = 0.000005, seed=100, round2.nsample=40, final.nsample=Inf, round=1) {
+param.finder = function(param = "beta1", start, target, digit = 1, target.digit=5, dist="Gaussian", tolerance = 0.000005, seed=100, round2.nsample=40, final.nsample=Inf, round=1) {
   # target.digit: the number of decimal placese of the final value to be returned
   # round: starting round among 1~3
   a <- Sys.time()                           # time check
@@ -15,8 +15,8 @@ param.finder = function(param = "beta1", start, target, digit = 1, target.digit=
   # routines
   nsample = function(digit, stdev=.0001) {
     if (digit<=2) {n.sample=1}
-    else if (digit==3) {n.sample=min(round((10^4 * stdev)^2,0),5)}
-    else if (digit==4) {n.sample=min(round((5*10^4 * stdev)^2,-1),10)}
+    else if (digit==3) {n.sample=max(3,min(round((10^4 * stdev)^2,0),5))}
+    else if (digit==4) {n.sample=max(5,min(round((5*10^4 * stdev)^2,-1),10))}
     else { n.sample=max(min(round((stdev/tolerance)^2,-2),20), 50) }
     return(n.sample)
   }
@@ -53,7 +53,7 @@ param.finder = function(param = "beta1", start, target, digit = 1, target.digit=
       for (j in 1:n.sample) {
         setTxtProgressBar(pb,j)
         temp <- data.frame(disease=rep(NA,n), marker=NA)
-        for (i in 1:n2) {temp[((i-1)*n1+1):(i*n1),] <- datagenerator(n=n1, alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, option="VDT")} ; Sys.time()-a
+        for (i in 1:n2) {temp[((i-1)*n1+1):(i*n1),] <- datagenerator(n=n1, alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, dist=dist, option="VDT")} ; Sys.time()-a
         tht[j] <- AUC(temp$marker[temp$disease==0], temp$marker[temp$disease==1]); Sys.time()-a
       }
       print(tht.mean <- mean(tht)); print(range(tht)); print(tht)
@@ -96,7 +96,7 @@ param.finder = function(param = "beta1", start, target, digit = 1, target.digit=
       for (j in 1:n.sample) {
         setTxtProgressBar(pb,j)
         temp <- data.frame(disease=rep(NA,n), marker=NA)
-        for (i in 1:n2) {temp[((i-1)*n1+1):(i*n1),] <- datagenerator(n=n1, alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, option="VDT")} ; Sys.time()-a
+        for (i in 1:n2) {temp[((i-1)*n1+1):(i*n1),] <- datagenerator(n=n1, alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, dist=dist, option="VDT")} ; Sys.time()-a
         tht[j] <- AUC(temp$marker[temp$disease==0], temp$marker[temp$disease==1])
         if (j %% floor(n.sample/5) == 0) {print(mean(tht, na.rm=TRUE))}
       }
@@ -168,3 +168,4 @@ param.finder = function(param = "beta1", start, target, digit = 1, target.digit=
 # th.80b = param.finder(start=0.8088, target=0.8, digit=4, round2.nsample=20, final.nsample=40)
 param.finder(start=1.473, target=0.9, digit=3,round=1) #alpha0=1.6111
 th.95.p70=param.finder(start=1.976, target=0.95, digit=4,round=3)
+param.exp1 <- param.finder(start=1.1, target=0.8, digit=2, dist="Exponential",round=1) #alpha0=1.6111

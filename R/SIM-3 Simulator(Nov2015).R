@@ -39,13 +39,13 @@ param1 = list(alphabet = data.frame(phi = rep(c(.5,.7), each=3),
                                     theta.SE =c(5.80868E-06,4.09076E-06,2.76121E-06,7.79383E-06, 5.34159E-06, 3.42365E-06) ,
                                     alpha0 = rep(c(0,1.6111), each=3), 
                                     beta1=c(0.8089, 1.4486, 1.97674,.8319,1.47286,2.00192)), 
-              gamma = data.frame(q1 = c(.7, .8), q2 = c(.8, .9), q3=c(.7, .8), q4=c(.8, .9), gamma = c(.7, .8)))
+              gamma = data.frame(q1 = c(.7, .8), q2 = c(.8, .9), q3=c(.7, .8), q4=c(.8, .9), gamma = c(.7, .8), rho = c(.5, .7)))
 # alpha0 = 0 for phi==0, alpha0 = 1.6111 for phi==.7
 # q3= q1, q4= q2: MAR settings
 
 ## 2.3.1.3 Param2 - Simulation ###########################################################
 n = c(200, 100, 50); n.max = max(n)
-n.sim = 100000    # To be changed to 10,000
+n.sim = 3    # To be changed to 10,000
 alpha = 0.05
 
 # CI.methods from 1-1 [CI] Base functions.R
@@ -64,12 +64,10 @@ R = 30
 ## 2.3.2.1 Simulation package (Data generation + Inference + Evaluation)  ################
 n.sim=1000
 { 
-  set.seed(100)
+  set.seed(200)
   bgn <- Sys.time()
   # setting dimensions and seed
-  d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n); set.seed = 50
-  d1 = 4:6
-  
+  d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n)
   ## steps
   imputation=TRUE    # run MI and estimates?
   Dir=FALSE          # run Direct approaches?
@@ -91,7 +89,8 @@ n.sim=1000
   
   # creating empty lists
   sim.data  <- temp.d1 <- temp.d2 <- temp.d3 <- temp.sim <- temp.n <- temp <- list() 
-    
+  error.index =0
+  
   # loop
   for (i in d1) {
     alpha0 = param1$alphabet$alpha0[i]
@@ -105,8 +104,9 @@ n.sim=1000
       q2  = param1$gamma$q2[j]
       q3  = param1$gamma$q3[j]
       q4  = param1$gamma$q4[j]
+      rho = param1$gamma$rho[j]
         
-      for (h in d3) {
+      for (h in d3) {  #h:n=200,100,50
         pb.text <- paste0("Data+",ifelse(imputation,"MI+",""),ifelse(Dir,"Dir+",""),"Est|")
         pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d123, pb.text), style=3)
         
@@ -129,6 +129,7 @@ n.sim=1000
           
         }
 
+        
         for (k in 1:n.sim) {
           # Progress bar
           setTxtProgressBar(pb,k)
@@ -146,28 +147,25 @@ n.sim=1000
           if (imputation==TRUE) {
             # B-Imp
             temp.MI <- list()
+            nonimputable <- list()
             for (l in MI.methods[,"methods"]) {
               # pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d123," (MI-",l,")|"), style=3)
-              nonestimable.pmm <- nonestimable <- FALSE
               if (l == "pmm" |l == "logreg") { 
-                if (l == "pmm" & all(temp$diseaseR[!is.na(temp$diseaseR)] == 1)) {
-                  # when every obs are 1's or 0's pmm cannot impute
-                  nonestimable.pmm = TRUE
+                temp.imp <- mice2(data=temp, method=l, m=m, predictorMatrix=cbind(0,(1 - diag(1, ncol(temp)))[,-1]), printFlag=FALSE)
+                if (identical(temp.imp,"error")) {
+                  temp.MI[[l]] = vector("list", m)
+                  nonimputable[[l]] = TRUE
                 } else {
-                  temp.imp <- mice2(data=temp, method=l, m=m, predictorMatrix=cbind(0,(1 - diag(1, ncol(temp)))[,-1]), printFlag=FALSE)
-                  if (temp.imp == "error") {
-                    temp.MI[[l]] = vector("list", m)
-                    nonestimable = TRUE
-                  } else {
-                    temp.comp <- list()
-                    for (q in 1:m) {temp.comp[[q]] = complete(temp.imp, action = q)[,c("diseaseR", "marker")]}
-                    temp.MI[[l]] = temp.comp                    
-                  }
+                  temp.comp <- list()
+                  for (q in 1:m) {temp.comp[[q]] = complete(temp.imp, action = q)[,c("diseaseR", "marker")]}
+                  temp.MI[[l]] = temp.comp  
+                  nonimputable[[l]] = FALSE
                 }
               }
               else if (l == "imp.norm") {
                 ###TBD!!!!!!
                 temp.MI[[l]] = temp.MI[[1]]  # proxy (pmm is copied)
+                nonimputable[[l]] = nonimputable[[1]]
               }
               else {print("Wrong MI method!")}
             }
@@ -177,10 +175,15 @@ n.sim=1000
               # pb <- txtProgressBar(min=0, max = n.sim*3, char = paste0(((i-1)*2+j-1)*3+h, "/",d123," (Est.MI-",l,")|"), style=3)
               # l.index = which(l ==MI.methods[,"methods"] )
               # setTxtProgressBar(pb,k + (l.index-1)*n.sim)
-              if (nonestimable.pmm == TRUE | nonestimable == TRUE) {
+              if (nonimputable[[l]] == TRUE) {
                 temp.estMI[[l]][k,] <- NA
               } else {
                 temp.estMI[[l]][k,] <- CI.i(temp.MI[[l]], fun=AUCCI.MI, CI.method=CI.methods, m=m, alpha=alpha, type="landscape2")
+              }
+              
+              if (l == "pmm" & (is.na(temp.estMI[[l]][k,2])|(temp.estMI[[l]][k,2]>=1 |temp.estMI[[l]][k,2] < 0  ))) {
+                error.index <- error.index +1
+                temp.comp.error[[error.index]] <- temp.MI[[l]]
               }
             }
           } #imputation==TRUE
@@ -198,7 +201,7 @@ n.sim=1000
         
         # storing A ~ C-2
         
-        temp.d4 <- list(parm = data.frame(theta=theta, phi=phi, gamma=gamma), est.com = temp.est)
+        temp.d4 <- list(parm = data.frame(theta=theta, phi=phi, gamma=gamma, rho=rho), est.com = temp.est)
         if (imputation==TRUE) {
           temp.d4[["est.MI"]] = temp.estMI
         }
@@ -210,14 +213,17 @@ n.sim=1000
         # D-1. Evaluation of C-1(est.com)
         temp.eval <- list()
         temp.eval[["1. complete"]] <- CI.evaluator(temp.d4[["est.com"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+        names(temp.eval)[1] <- paste0("theta=",theta,", phi=",phi,", rho=",rho,", n=",n[h],", 1.complete")
         if (imputation==TRUE) {
           temp.eval[["2. pmm"]] <- CI.evaluator(temp.d4[["est.MI"]][["pmm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
           temp.eval[["3. logreg"]] <- CI.evaluator(temp.d4[["est.MI"]][["logreg"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
           temp.eval[["4. imp.norm"]] <- CI.evaluator(temp.d4[["est.MI"]][["imp.norm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+          names(temp.eval)[2:4] <- paste0("theta=",theta,", phi=",phi,", rho=",rho,", n=",n[h],c(", 2.pmm", ", 3.logreg", ", 4.imp.norm"))
         } #imputation==TRUE
         if (Dir==TRUE) {
           temp.eval[["5. Bootstrap-BCA"]] <- CI.evaluator(temp.d4[["est.Dir.BCA"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
           temp.eval[["6. Bootstrap-Wald"]] <- CI.evaluator(temp.d4[["est.Dir.Wald"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
+          names(temp.eval)[ifelse(imputation==TRUE,5:6,2:3)] <- paste0("theta=",theta,", phi=",phi,", rho=",rho,", n=",n[h],c(", 5. Bootstrap-BCA", ", 6. Bootstrap-Wald"))
         } #Dir==TRUE
         temp.d3[[h]] <- temp.d4
         temp.d3[[h]]$eval <- temp.eval
@@ -228,7 +234,7 @@ n.sim=1000
         print(paste0("bgn: ", format(bgn,"%m/%d %H:%M"), ", elapsed: ", round(elapsed,1), " min's, expected: ", format(expected,"%m/%d %H:%M"), ", i: ", paste(i,"in", length(d1)), ", j: ", paste(j,"in", length(d2)), ", h: ", paste(h,"in", length(d3)) ))
       
       } # h in d3
-      saveRDS(temp.d3, paste0("sim_data-1k-","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
+      saveRDS(temp.d3, paste0("sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
       temp.d2[[j]] <- temp.d3
       
     } # j in d2

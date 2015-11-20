@@ -35,13 +35,17 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
   
   else if (CI.method == "NS1" | CI.method == "NS2" ) {
     NC = (CI.method == "NS2")
-    if (start[2]==1) {
-      ub = 1; start = start[1]
-      lb = multiroot2(HMS.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, NC=NC, rtol = 1e-10, atol = 1e-10,...)$root  #original scale    
-      CI = c(lb, ub)
-    } else {
-      CI = multiroot2(HMS.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, NC=NC, rtol = 1e-10, atol = 1e-10,...)$root  #original scale
-    }    
+    if (LT==FALSE) {
+      CI = polyroot2(HM.coef, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, r=0, NC=NC)
+    } else{
+      if (start[2]==1) {
+        ub = 1; start = start[1]
+        lb = multiroot2(HMS.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, NC=NC, rtol = 1e-10, atol = 1e-10,...)$root  #original scale    
+        CI = c(lb, ub)
+      } else {
+        CI = multiroot2(HMS.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, NC=NC, rtol = 1e-10, atol = 1e-10,...)$root  #original scale
+      }      
+    }
     CI.LT = logit(CI, LT=LT)
     if (variance) {V.LT = V.HM(A, n.x, n.y, LT=LT, NC=NC,...)}
   }
@@ -82,7 +86,11 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
 
   else if (CI.method == "Mee") {
     N.J.hat = Mee.stat(x, y, n.x, n.y)$N.J.hat
-    CI = multiroot2(Mee.equation, start, AUC.hat=A, N.J.hat=N.J.hat, alpha=alpha, LT=LT, rtol = 1e-10, atol = 1e-10,...)$root
+    if (LT==FALSE) {
+      CI = polyroot2(Mee.coef, AUC.hat=A, N.J.hat=N.J.hat, alpha=alpha, r=0)
+    } else{
+      CI = multiroot2(Mee.equation, start, AUC.hat=A, N.J.hat=N.J.hat, alpha=alpha, LT=LT, rtol = 1e-10, atol = 1e-10,...)$root
+    }
     CI.LT = logit(CI, LT=LT)
     if (variance) {
       V.LT=V.Mee(x, y, n.x=n.x, n.y=n.y, LT=LT,...) 

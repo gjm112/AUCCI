@@ -6,7 +6,7 @@ library(MASS)  # for mvrnorm
 
 ## 2.1.1 datagenerator ################################################################## 
 # should segregate D=0 and D=1 for R
-datagenerator <- function(n, alpha0, alpha1, beta0, beta1, beta2, beta3, sig, q1, q2, q3, q4, gamma ,mu.V,Sigma, option="VDTR"){
+datagenerator <- function(n, alpha0, alpha1, beta0, beta1, beta2, beta3, sig, q1, q2, q3, q4, gamma ,mu.V,Sigma, dist="Gaussian", option="VDTR"){
   V = mvrnorm(n, mu.V, Sigma)
   phi = (1+ exp(alpha0 + V%*%alpha1)^-1)^-1
   D = rbinom(n, 1, phi)
@@ -14,8 +14,11 @@ datagenerator <- function(n, alpha0, alpha1, beta0, beta1, beta2, beta3, sig, q1
     return(data.frame(disease=D, V=V))
   } else {
     mu.T = beta0 + D*beta1 + V%*%beta2 + D*V%*%beta3
-    Te = mu.T + sig*rnorm(n)
-
+    if (dist=="Gaussian") {
+      Te = mu.T + sig*rnorm(n)
+    } else if (dist=="Exponential"){
+      Te = rexp(n,1/exp(mu.T))
+    }
     if (option == "VDR") {
       return(data.frame(disease=D, marker=Te))
     } else {  # option="VDTR"
