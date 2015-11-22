@@ -76,6 +76,23 @@ d123 <- length(d1)*length(d2)*length(d3)
 na.rm = TRUE # for evaluation
 
 { 
+<<<<<<< HEAD
+=======
+  set.seed(200)
+  bgn <- Sys.time()
+  # setting dimensions and seed
+  d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n)
+  ## steps
+  imputation=TRUE    # run MI and estimates?
+  Dir=FALSE          # run Direct approaches?
+  #save.Est=FALSE    # save Inferences(Estimations)?
+  
+  
+  # d1 <- 2; d2 <-1; d3 <-2; imputation=FALSE
+  d123 <- length(d1)*length(d2)*length(d3)
+  na.rm = TRUE # for evaluation
+  
+>>>>>>> d941f5f00f364ada470ec34677ef19c6fb07c6a4
   # data structure
   # temp.d1 (=sim.data) = list of 6 elements(temp.d2): one for each theta & phi
   # temp.d2             = list of 2 elements(unnamed list): one for each rho
@@ -150,6 +167,7 @@ na.rm = TRUE # for evaluation
             for (l in MI.methods[,"methods"]) {
               # pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d123," (MI-",l,")|"), style=3)
               if (l == "pmm" |l == "logreg") { 
+<<<<<<< HEAD
                 temp.MI[[l]] <- mice2(data=temp[,-1], method=l, m=m, printFlag=FALSE)
                 if (is.na(temp.MI[[l]][[1]])) { nonimputable[[l]] = TRUE} 
                 else {nonimputable[[l]] = FALSE}
@@ -157,6 +175,23 @@ na.rm = TRUE # for evaluation
               else if (l == "simple"|l == "coinflip"|l == "adaptive") {
                 temp.MI[[l]] <- MI.norm(data=temp[,-1], rounding=l, m=m, showits=FALSE)
                 nonimputable[[l]] = FALSE
+=======
+                temp.imp <- mice2(data=temp, method=l, m=m, predictorMatrix=cbind(0,(1 - diag(1, ncol(temp)))[,-1]), printFlag=FALSE)
+                if (identical(temp.imp,"error")) {
+                  temp.MI[[l]] = vector("list", m)
+                  nonimputable[[l]] = TRUE
+                } else {
+                  temp.comp <- list()
+                  for (q in 1:m) {temp.comp[[q]] = complete(temp.imp, action = q)[,c("diseaseR", "marker")]}
+                  temp.MI[[l]] = temp.comp  
+                  nonimputable[[l]] = FALSE
+                }
+              }
+              else if (l == "imp.norm") {
+                ###TBD!!!!!!
+                temp.MI[[l]] = temp.MI[[1]]  # proxy (pmm is copied)
+                nonimputable[[l]] = nonimputable[[1]]
+>>>>>>> d941f5f00f364ada470ec34677ef19c6fb07c6a4
               }
               else {print("Wrong MI method!")}
             }
@@ -208,6 +243,7 @@ na.rm = TRUE # for evaluation
         if (imputation==TRUE) {
           temp.eval[["2. pmm"]] <- CI.evaluator(temp.d4[["est.MI"]][["pmm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
           temp.eval[["3. logreg"]] <- CI.evaluator(temp.d4[["est.MI"]][["logreg"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+<<<<<<< HEAD
           temp.eval[["4. simple"]] <- CI.evaluator(temp.d4[["est.MI"]][["simple"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
           temp.eval[["5. coinflip"]] <- CI.evaluator(temp.d4[["est.MI"]][["coinflip"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
           temp.eval[["6. adaptive"]] <- CI.evaluator(temp.d4[["est.MI"]][["adaptive"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
@@ -217,6 +253,15 @@ na.rm = TRUE # for evaluation
           temp.eval[["7. Bootstrap-BCA"]] <- CI.evaluator(temp.d4[["est.Dir.BCA"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
           temp.eval[["8. Bootstrap-Wald"]] <- CI.evaluator(temp.d4[["est.Dir.Wald"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
           names(temp.eval)[ifelse(imputation==TRUE,7:8,2:3)] <- paste0("theta=",theta,", phi=",phi,", rho=",rho,", n=",n[h],c(", 7. Bootstrap-BCA", ", 8. Bootstrap-Wald"))
+=======
+          temp.eval[["4. imp.norm"]] <- CI.evaluator(temp.d4[["est.MI"]][["imp.norm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+          names(temp.eval)[2:4] <- paste0("theta=",theta,", phi=",phi,", rho=",rho,", n=",n[h],c(", 2.pmm", ", 3.logreg", ", 4.imp.norm"))
+        } #imputation==TRUE
+        if (Dir==TRUE) {
+          temp.eval[["5. Bootstrap-BCA"]] <- CI.evaluator(temp.d4[["est.Dir.BCA"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
+          temp.eval[["6. Bootstrap-Wald"]] <- CI.evaluator(temp.d4[["est.Dir.Wald"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
+          names(temp.eval)[ifelse(imputation==TRUE,5:6,2:3)] <- paste0("theta=",theta,", phi=",phi,", rho=",rho,", n=",n[h],c(", 5. Bootstrap-BCA", ", 6. Bootstrap-Wald"))
+>>>>>>> d941f5f00f364ada470ec34677ef19c6fb07c6a4
         } #Dir==TRUE
         temp.d3[[h]] <- temp.d4
         temp.d3[[h]]$eval <- temp.eval

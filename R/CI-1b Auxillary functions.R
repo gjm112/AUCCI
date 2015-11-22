@@ -1,8 +1,11 @@
 ### Part I. CI functions
 ## 1-1b [CI] Auxillary functions: 1.1b.1 Rubin, 1.1.2 Error handling(mice, numerical solutions), 
+<<<<<<< HEAD
 library(mice)       # for Multiple Imputation
 library(norm)         # for Multiple Imputation
 
+=======
+>>>>>>> d941f5f00f364ada470ec34677ef19c6fb07c6a4
 
 # 1.1b.1 Combining Multiple imputations
 # variance estimator for multiple imputation
@@ -28,6 +31,17 @@ Rubin = function(W, MI, alpha=0.05, print.r=FALSE, print.nu=FALSE) {
 
 
 # Handling errors
+<<<<<<< HEAD
+=======
+# mice without error
+mice2 = function(data, m = 5, ..., silent=FALSE) {
+  tmp <- try(mice(data = data, m = m, ...),silent=silent)
+  if (class(tmp)=="try-error") {
+    result <- "error"} else {result <- tmp}
+  return(result)
+}
+
+>>>>>>> d941f5f00f364ada470ec34677ef19c6fb07c6a4
 # rootSolve:::multiroot without error
 multiroot2 = function(f, start,..., silent=FALSE) {
   tmp <- try(multiroot(f, start,...),silent=silent)
@@ -58,6 +72,7 @@ polyroot2 = function(fun,AUC.hat,..., silent=TRUE) {
     if (!is.finite(lb)) {lb=NA}; if (!is.finite(ub)) {ub=NA}
   }
   return(c(lb,ub))
+<<<<<<< HEAD
 }
 
 
@@ -103,3 +118,6 @@ MI.norm <- function(data, m=5, rounding="simple", rnd.vec = "diseaseR", return.v
   data.comp = lapply(data.comp, function(data) {data[,rnd.vec] = adp.round(data[,rnd.vec], rounding=rounding); return(data[,return.vec])}) # limiting the prediction range to [0,1]
 }
 
+=======
+}
+>>>>>>> d941f5f00f364ada470ec34677ef19c6fb07c6a4

@@ -168,4 +168,4 @@ param.finder = function(param = "beta1", start, target, digit = 1, target.digit=
 # th.80b = param.finder(start=0.8088, target=0.8, digit=4, round2.nsample=20, final.nsample=40)
 param.finder(start=1.473, target=0.9, digit=3,round=1) #alpha0=1.6111
 th.95.p70=param.finder(start=1.976, target=0.95, digit=4,round=3)
-param.exp1 <- param.finder(start=1.1, target=0.8, digit=2, dist="Exponential",round=1) #alpha0=1.6111
+param.exp1 <- param.finder(start=1.0, target=0.8, digit=2, dist="Exponential",round=1) #alpha0=1.6111
