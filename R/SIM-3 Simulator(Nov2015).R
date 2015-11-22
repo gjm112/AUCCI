@@ -66,7 +66,7 @@ n.sim=10000
 bgn <- Sys.time()
 # setting dimensions and seed
 d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n)
-d1 = 4:6
+d1 = 4:6 
 
 ## steps
 imputation=TRUE    # run MI and estimates?
