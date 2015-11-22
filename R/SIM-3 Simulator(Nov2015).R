@@ -66,7 +66,7 @@ n.sim=10000
 bgn <- Sys.time()
 # setting dimensions and seed
 d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n)
-d1 = 4:6 
+d1 = 4:6
 
 ## steps
 imputation=TRUE    # run MI and estimates?
@@ -76,8 +76,6 @@ d123 <- length(d1)*length(d2)*length(d3)
 na.rm = TRUE # for evaluation
 
 { 
-<<<<<<< HEAD
-=======
   set.seed(200)
   bgn <- Sys.time()
   # setting dimensions and seed
@@ -91,8 +89,7 @@ na.rm = TRUE # for evaluation
   # d1 <- 2; d2 <-1; d3 <-2; imputation=FALSE
   d123 <- length(d1)*length(d2)*length(d3)
   na.rm = TRUE # for evaluation
-  
->>>>>>> d941f5f00f364ada470ec34677ef19c6fb07c6a4
+
   # data structure
   # temp.d1 (=sim.data) = list of 6 elements(temp.d2): one for each theta & phi
   # temp.d2             = list of 2 elements(unnamed list): one for each rho
@@ -167,7 +164,6 @@ na.rm = TRUE # for evaluation
             for (l in MI.methods[,"methods"]) {
               # pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d123," (MI-",l,")|"), style=3)
               if (l == "pmm" |l == "logreg") { 
-<<<<<<< HEAD
                 temp.MI[[l]] <- mice2(data=temp[,-1], method=l, m=m, printFlag=FALSE)
                 if (is.na(temp.MI[[l]][[1]])) { nonimputable[[l]] = TRUE} 
                 else {nonimputable[[l]] = FALSE}
@@ -175,7 +171,6 @@ na.rm = TRUE # for evaluation
               else if (l == "simple"|l == "coinflip"|l == "adaptive") {
                 temp.MI[[l]] <- MI.norm(data=temp[,-1], rounding=l, m=m, showits=FALSE)
                 nonimputable[[l]] = FALSE
-=======
                 temp.imp <- mice2(data=temp, method=l, m=m, predictorMatrix=cbind(0,(1 - diag(1, ncol(temp)))[,-1]), printFlag=FALSE)
                 if (identical(temp.imp,"error")) {
                   temp.MI[[l]] = vector("list", m)
@@ -191,7 +186,6 @@ na.rm = TRUE # for evaluation
                 ###TBD!!!!!!
                 temp.MI[[l]] = temp.MI[[1]]  # proxy (pmm is copied)
                 nonimputable[[l]] = nonimputable[[1]]
->>>>>>> d941f5f00f364ada470ec34677ef19c6fb07c6a4
               }
               else {print("Wrong MI method!")}
             }
@@ -243,7 +237,6 @@ na.rm = TRUE # for evaluation
         if (imputation==TRUE) {
           temp.eval[["2. pmm"]] <- CI.evaluator(temp.d4[["est.MI"]][["pmm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
           temp.eval[["3. logreg"]] <- CI.evaluator(temp.d4[["est.MI"]][["logreg"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
-<<<<<<< HEAD
           temp.eval[["4. simple"]] <- CI.evaluator(temp.d4[["est.MI"]][["simple"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
           temp.eval[["5. coinflip"]] <- CI.evaluator(temp.d4[["est.MI"]][["coinflip"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
           temp.eval[["6. adaptive"]] <- CI.evaluator(temp.d4[["est.MI"]][["adaptive"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
@@ -253,7 +246,6 @@ na.rm = TRUE # for evaluation
           temp.eval[["7. Bootstrap-BCA"]] <- CI.evaluator(temp.d4[["est.Dir.BCA"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
           temp.eval[["8. Bootstrap-Wald"]] <- CI.evaluator(temp.d4[["est.Dir.Wald"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
           names(temp.eval)[ifelse(imputation==TRUE,7:8,2:3)] <- paste0("theta=",theta,", phi=",phi,", rho=",rho,", n=",n[h],c(", 7. Bootstrap-BCA", ", 8. Bootstrap-Wald"))
-=======
           temp.eval[["4. imp.norm"]] <- CI.evaluator(temp.d4[["est.MI"]][["imp.norm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
           names(temp.eval)[2:4] <- paste0("theta=",theta,", phi=",phi,", rho=",rho,", n=",n[h],c(", 2.pmm", ", 3.logreg", ", 4.imp.norm"))
         } #imputation==TRUE
@@ -261,7 +253,6 @@ na.rm = TRUE # for evaluation
           temp.eval[["5. Bootstrap-BCA"]] <- CI.evaluator(temp.d4[["est.Dir.BCA"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
           temp.eval[["6. Bootstrap-Wald"]] <- CI.evaluator(temp.d4[["est.Dir.Wald"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
           names(temp.eval)[ifelse(imputation==TRUE,5:6,2:3)] <- paste0("theta=",theta,", phi=",phi,", rho=",rho,", n=",n[h],c(", 5. Bootstrap-BCA", ", 6. Bootstrap-Wald"))
->>>>>>> d941f5f00f364ada470ec34677ef19c6fb07c6a4
         } #Dir==TRUE
         temp.d3[[h]] <- temp.d4
         temp.d3[[h]]$eval <- temp.eval
@@ -281,46 +272,3 @@ na.rm = TRUE # for evaluation
   sim.data = temp.d1
   rm(temp.d1,temp.d2)
 }
-
-
-mean(sim.data[[6]][[1]][[2]]$est.com$AUC.hat)
-
-## Optional: saving the datafile  ########################################################
-saveRDS(sim.data.212, "simdata_212.rds")
-saveRDS(sim.data.311, "simdata_311.rds")
-sim.data.0927 <- readRDS("sim_data_0927.rds")
-saveRDS(temp.eval,"simdata_1111.rds")
-## 2.3.2.2 Simulation by part (Evaluation only)  #########################################
-temp.d4 = temp.d1[[1]][[1]][[1]]
-a <- list
-{
-  # d1 = 6; d2 = 2;na.rm=ra.rm; set.seed=...
-  # need to be updated if want to use this
-  set.seed(100)
-  for (i in 1:d1) {
-    for (j in 1:d2){ 
-      for (h in 1:d3) {
-        temp.eval <- list()
-        temp.eval[["1. complete"]] <- CI.evaluator(temp.d4[["est.com"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
-        temp.eval[["2. pmm"]] <- CI.evaluator(temp.d4[["est.MI"]][["pmm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
-        temp.eval[["3. logreg"]] <- CI.evaluator(temp.d4[["est.MI"]][["logreg"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
-        temp.eval[["4. imp.norm"]] <- CI.evaluator(temp.d4[["est.MI"]][["imp.norm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
-        temp.eval[["5. Bootstrap"]] <- CI.evaluator(temp.d4[["est.Dir"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
-      }
-    }
-  }
-}
-
-
-## Example: checking missing rate #####################################################
-for(i in 1:20) {print(mean(sim.data[[6]][[2]][[1]][[i]]$R, na.rm=T))}
-sim.data.complete <- sim.data
-## addressing example
-# phi = .7, theta=.8  (=> 4th)
-# rho = .5            (=> 1th)
-# eval                (=> 4th)    # or 5th sample data (=> [[1]][[5]])
-sim.data[[4]][[1]][[4]]
-head(sim.data[[4]][[1]][[1]][[5]])
-head(sim.data[[4]][[1]][[3]])
-
-t(sim.data[[4]][[2]][[4]][[1]])[,1]
