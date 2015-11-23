@@ -47,7 +47,7 @@ CI.evaluator = function(data, param, CI.method = sub(".lb","",matrix(names(data)
   # NaN prob.
   eval[4,] = apply(temp.2, 2, function(x) mean(is.na(x)))
   
-  # CIL
+  # CIL]
   temp.3 = temp[,seq(2,2*len.col,by=2)] - temp[,seq(1,2*len.col-1,by=2)]
   eval[5,] = apply(temp.3, 2, mean, na.rm=na.rm)
   # ZWI

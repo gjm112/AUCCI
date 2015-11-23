@@ -111,6 +111,3 @@ AUCCI.boot = function(data,R,alpha=0.05,base.fun=AUC.verif,CI.method, print.boot
   if (print.boots) {result$boot.statistics = AUC.hats}
   return( result )
 }
-a <- Sys.time()
-set.seed(10); AUCCI.boot(data[1:30,], R=30, CI.method=Dir.methods, type="landscape1")
-#Sys.time() - a

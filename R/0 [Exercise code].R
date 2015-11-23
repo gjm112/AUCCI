@@ -51,6 +51,7 @@ AUC.verif(temp,,CI.method="He")    # basically He is equivalent to IPW
 
 ### 1-4 AUCCI.boot #####################################################
 AUCCI.boot(temp,R=100,alpha=.05,base.fun=AUC.verif,CI.method="BG")
+AUCCI.boot(data[1:30,], R=30, CI.method=Dir.methods, type="landscape1")
 
 ### 1-5 AUCCI.MI #####################################################
 ## preset arguments
@@ -92,4 +93,58 @@ table(data.frame(disease=temp[,c("disease")], diseaseR=ifelse(is.na(temp$disease
 
 ### 2-2 ddd #####################################################
 
+### CI-1b optim2, multiroot.....
+optim(.7, HMS2.equation, AUC.hat = 0.88, n.x=4, n.y=46, alpha=0.05, LT=FALSE, NC=FALSE, lower=0, upper=1, method="L-BFGS-B")
+optim(1, HMS2.equation, AUC.hat = 0.88, n.x=4, n.y=46, alpha=0.05, LT=FALSE, NC=FALSE, lower=0, upper=1, method="L-BFGS-B")
+optim2(HMS.equation, c(0.7,1), AUC.hat=0.88,n.x=4, n.y=46, alpha=0.05, LT=FALSE, NC=FALSE)
+AUCCI.MI(temp.comp.error[[1]], CI.method="NS1")
+
+multiroot(V.HM,c(.7,1.0), n.x=4, n.y=46, alpha=0.05, LT=FALSE, NC=FALSE)$root
+HMS2.equation = function(...) {HMS.equation(...)^2}
+
+
+
+### 3 Sim ########
+
+mean(sim.data[[6]][[1]][[2]]$est.com$AUC.hat)
+
+## Optional: saving the datafile  ########################################################
+saveRDS(sim.data.212, "simdata_212.rds")
+saveRDS(sim.data.311, "simdata_311.rds")
+sim.data.0927 <- readRDS("sim_data_0927.rds")
+saveRDS(temp.eval,"simdata_1111.rds")
+## 2.3.2.2 Simulation by part (Evaluation only)  #########################################
+temp.d4 = temp.d1[[1]][[1]][[1]]
+a <- list
+{
+  # d1 = 6; d2 = 2;na.rm=ra.rm; set.seed=...
+  # need to be updated if want to use this
+  set.seed(100)
+  for (i in 1:d1) {
+    for (j in 1:d2){ 
+      for (h in 1:d3) {
+        temp.eval <- list()
+        temp.eval[["1. complete"]] <- CI.evaluator(temp.d4[["est.com"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+        temp.eval[["2. pmm"]] <- CI.evaluator(temp.d4[["est.MI"]][["pmm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+        temp.eval[["3. logreg"]] <- CI.evaluator(temp.d4[["est.MI"]][["logreg"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+        temp.eval[["4. imp.norm"]] <- CI.evaluator(temp.d4[["est.MI"]][["imp.norm"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+        temp.eval[["5. Bootstrap"]] <- CI.evaluator(temp.d4[["est.Dir"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
+      }
+    }
+  }
+}
+
+
+## Example: checking missing rate #####################################################
+for(i in 1:20) {print(mean(sim.data[[6]][[2]][[1]][[i]]$R, na.rm=T))}
+sim.data.complete <- sim.data
+## addressing example
+# phi = .7, theta=.8  (=> 4th)
+# rho = .5            (=> 1th)
+# eval                (=> 4th)    # or 5th sample data (=> [[1]][[5]])
+sim.data[[4]][[1]][[4]]
+head(sim.data[[4]][[1]][[1]][[5]])
+head(sim.data[[4]][[1]][[3]])
+
+t(sim.data[[4]][[2]][[4]][[1]])[,1]
 
