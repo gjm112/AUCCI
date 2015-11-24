@@ -2,8 +2,8 @@
 
 ########################################
 library(foreach) # foreach
-library(doMC)    # %dopar% in foreach
-registerDoMC(cores=4)
+#library(doMC)    # %dopar% in foreach
+#registerDoMC(cores=4)
 library(doSNOW)
 library(tcltk)
 cl <- makeSOCKcluster(3)
@@ -11,6 +11,7 @@ registerDoSNOW(cl)
 
 exp.packages = c("foreach","MASS", "mice", "norm", "rootSolve", "sn", "tcltk")
 exp.functions = names(which(eapply(globalenv(), class) == "function"))
+exp.functions2 = c("Rubin", "S.stat")
 ########################################
 
 # Structure has changed since Nov 5.
@@ -55,6 +56,7 @@ n.sim=10
 bgn <- Sys.time()
 # setting dimensions and seed
 d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n)
+d1 <- d2 <- 1
 d123 <- length(d1)*length(d2)*length(d3)
 
 ## steps
@@ -114,7 +116,7 @@ sim.by.k = function(k, h, n,
   } #Dir==TRUE
 }
 
-sim.by.ijh <- function(i, j, h, d123, param, mu.V, Sigma, CI.method, alpha, n,
+sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method, alpha, n,
                        imputation, MI.method, Dir, m, Dir.method, R) {
   
   ### 1. basic setting
@@ -145,16 +147,39 @@ sim.by.ijh <- function(i, j, h, d123, param, mu.V, Sigma, CI.method, alpha, n,
   temp.estDir.BCA <<- temp.estDir.Wald <<-  as.data.frame(matrix(NA,n.sim,(length(Dir.methods)*2+1)))
   names(temp.estDir.BCA) <<- names(temp.estDir.Wald) <<- c("AUC.hat",paste0(rep(Dir.methods,each=2),c(".lb",".ub")))
   
+  # for progressbar
+  pbar <- function(n.sim, i, j, h, d123){
+    function(...) {
+      count <<- count + 1
+      #pb.text <- paste0("Data+",ifelse(imputation,"MI+",""),ifelse(Dir,"Dir+",""),"Est|")
+      #pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d123, pb.text), style=3)
+      #setTxtProgressBar(pb,count)
+      if (k %% 100 == 0) {write.csv(NA, paste0("progress/progress(",paste0(c(i,j,h,k),collapse="-"),")",format(Sys.time(), "%b%d-%H%M%S"),".csv"))}
+      if (count %% 300 == 0) {
+        progress = count / (d123*n.sim)
+        elapsed = Sys.time() - bgn
+        expected = bgn + elapsed/progress
+        write.csv(NA, paste0("progress/Expected(as of ",format(Sys.time(), "%b%d-%H%M"),") is ",format(expected, "%b%d-%H%M"),".csv"))
+      }
+      #Sys.sleep(0.01)
+      #flush.console()
+      #c(...)
+    }
+  }
+  
+  #CI.method=CI.method, alpha=alpha,
+  #imputation=imputation, MI.method=MI.method, m=m, Dir=Dir, Dir.method=Dir.method, R=R)
+  
   # Estimation: simulation by k
-  b <- foreach (k=1:n.sim) %do% {  # can't do dopar. dopar doesn't produce values for temp.est etc
-    # setTxtProgressBar(pb,k, title=pb.text)
+  b <- foreach (k=1:n.sim, .combine=pbar(n.sim, i,j,h,d123)) %do% {  # can't do dopar. dopar doesn't produce values for temp.est etc
+    # setTxtProgressBar(pb,k)
     # sim.by.k function is manipulating the data by using High level assigning operator (<<-): 
     # temp.est, temp.estMI, temp.estDir.BCA, temp.estDir.Wald
     sim.by.k (k=k, h=h, n=n,
               alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, 
               sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, rho=rho, mu.V=mu.V, Sigma=Sigma,
-              CI.method=CI.methods, alpha=alpha,
-              imputation=imputation, MI.method=MI.method, m=m, Dir=Dir, Dir.method=Dir.methods, R=R)
+              CI.method=CI.method, alpha=alpha,
+              imputation=imputation, MI.method=MI.method, m=m, Dir=Dir, Dir.method=Dir.method, R=R)
   }
   
   # storing A ~ C-2
@@ -186,47 +211,37 @@ sim.by.ijh <- function(i, j, h, d123, param, mu.V, Sigma, CI.method, alpha, n,
 
 
 ## 2.3.2.2 Simulation package (Data generation + Inference + Evaluation)  ################
+count <- 1   # for time checking in dopar
 
-{ 
-  # data structure
-  # temp.d1 (=sim.data) = list of 6 elements(temp.d2): one for each theta & phi
-  # temp.d2             = list of 2 elements(unnamed list): one for each rho
-  # temp.d3             = list of 4 elements(temp.sim, param, temp.est, temp.eval)
-  # temp.sim            = list of 10000(=n.sim) elements: the unit samples
-  # temp.est            = list of 3 elements(temp.est.n): one for n(200, 100, 5)
-  # temp.est.n          = a dataframe of estimators(point and CI's)
-  # temp.eval           = a dataframe of evaluation of the estimators
-  
-  # creating empty lists : remove when final for loop is developed and they are not necessary any more.
-  sim.data  <- temp.d1 <- temp.d2 <- list()
-  i <- j <- 1
-  a <- Sys.time()
-  temp.d3  <- foreach (h=d3, .packages=exp.packages, .export=exp.functions) %dopar% {
-    set.seed(i*j*h*100)
+
+n.sim=1000
+
+pb <- txtProgressBar(min=0, max = length(d1)*length(d2), style=3)
+for (i in d1) { 
+  for (j in d2) {
+    sim.data  <- temp.d1 <- temp.d2 <- list()
+    bgn <- Sys.time()
     # progress(h)
-    # pb.text <- paste0("Data+",ifelse(imputation,"MI+",""),ifelse(Dir,"Dir+",""),"Est|")
-    # pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d123, pb.text), style=3)
-    # sim.by.k function is manipulating the data by using High level assigning operator (<<-): 
-    # temp.est, temp.estMI, temp.estDir.BCA, temp.estDir.Wald
-    sim.by.ijh (i=i, j=j, h=h, d123=d123, param=param1, mu.V=mu.V, Sigma=Sigma, CI.method=CI.methods, alpha=alpha, n=n,
-                imputation=imputation, MI.method = MI.methods[,"methods"], 
-                Dir=Dir, m=m, Dir.method=Dir.methods, R=R)
-  }
-  Sys.time() - a
-  saveRDS(temp.d3, paste0("sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
-  # Time stat
-  elapsed = Sys.time()-bgn
-  expected = bgn + elapsed/(((i-1)*2+j)*3+h)*(d123)
-  print(paste0("bgn: ", format(bgn,"%m/%d %H:%M"), ", elapsed: ", round(elapsed,1), " min's, expected: ", format(expected,"%m/%d %H:%M"), ", i: ", paste(i,"in", length(d1)), ", j: ", paste(j,"in", length(d2)), ", h: ", paste(h,"in", length(d3)) ))
-
-      } # h in d3
-saveRDS(temp.d3, paste0("sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
-temp.d2[[j]] <- temp.d3
-
+    setTxtProgressBar(pb,(i-1)*length(d2)+j)
+    temp.d3  <- foreach (h=d3, .packages=exp.packages, .export=exp.functions2) %dopar% {
+      set.seed(i*j*h*100)
+      # sim.by.k function is manipulating the data by using High level assigning operator (<<-): 
+      # temp.est, temp.estMI, temp.estDir.BCA, temp.estDir.Wald
+      sim.by.ijh (i=i, j=j, h=h, d123=d123, pb=pb, pb.text=pb.text, param=param1, mu.V=mu.V, Sigma=Sigma, CI.method=CI.methods, alpha=alpha, n=n,
+                  imputation=imputation, MI.method = MI.methods[,"methods"], 
+                  Dir=Dir, m=m, Dir.method=Dir.methods, R=R)
+    }
+    
+    saveRDS(temp.d3, paste0("sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
+    # Time stat
+    elapsed = Sys.time()-bgn
+    expected = bgn + elapsed/((i-1)*2+j)*12
+    print(paste0("bgn: ", format(bgn,"%m/%d %H:%M"), ", elapsed: ", round(elapsed,1), " min's, expected: ", format(expected,"%m/%d %H:%M"), ", i: ", paste(i,"in", length(d1)), ", j: ", paste(j,"in", length(d2)) ))
+    
+    temp.d2[[j]] <- temp.d3
     } # j in d2
-temp.d1[[i]] <- temp.d2
-  } # i in d1
-sim.data = temp.d1
-rm(temp.d1,temp.d2)
-}
+  temp.d1[[i]] <- temp.d2
+} # i in d1
+sim.data = temp.d1; rm(temp.d1,temp.d2)
+
 
