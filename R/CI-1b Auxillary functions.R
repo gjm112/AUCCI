@@ -84,6 +84,7 @@ adp.round <- function(x, rounding="simple", vec=x) {
   } else if (rounding == "coinflip") {
     x = sapply(x, function(x) rbinom(1,1,x))
   } else if (rounding == "adaptive") {
+    vec = pmax(pmin(vec,1),0)
     omega = mean(vec, na.rm = TRUE)
     cutoff = omega - qnorm(omega) * sqrt(omega*(1-omega))
     x = (x>=cutoff)*1

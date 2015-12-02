@@ -121,20 +121,22 @@ HM.coef = function(AUC.hat, n.x, n.y, NC=FALSE, alpha, r=0){   #coefficients of 
 }
 
 V.CM <- function(AUC, n.x, n.y, LT=FALSE){
-  z1 = function (w, n.x, n.y, k) {1-0.5*(w/n.y+(k-w)/n.x)}
-  z2 = function (w, n.x, n.y, k) 
-    (n.x*w^2+n.y*(k-w)^2+n.x*(n.x+1)*w+n.y*(n.y+1)*(k-w)-2*w*(k-w)*(n.x+n.y+1))/(12*n.x^2*n.y^2)
-  F.base <- function (w, n.x, n.y, k) {choose(n.x-k+2*w,w)*choose(n.y+k-2*w,k-w)}
-  k=round((n.x+n.y)*(1-AUC))
-  F1=F2=F3=F.den=0
-  for (w in 0:k){
-    F1 = F1 + F.base(w, n.x, n.y, k)*z1(w, n.x, n.y, k)^2
-    F.den = F.den + F.base(w, n.x, n.y, k)
-    F2 = F2 + F.base(w, n.x, n.y, k)*z1(w, n.x, n.y, k)
-    F3 = F3 + F.base(w, n.x, n.y, k)*z2(w, n.x, n.y, k)
+  if (is.na(AUC)) {return(V=NA)} else {
+    z1 = function (w, n.x, n.y, k) {1-0.5*(w/n.y+(k-w)/n.x)}
+    z2 = function (w, n.x, n.y, k) 
+      (n.x*w^2+n.y*(k-w)^2+n.x*(n.x+1)*w+n.y*(n.y+1)*(k-w)-2*w*(k-w)*(n.x+n.y+1))/(12*n.x^2*n.y^2)
+    F.base <- function (w, n.x, n.y, k) {choose(n.x-k+2*w,w)*choose(n.y+k-2*w,k-w)}
+    k=round((n.x+n.y)*(1-AUC))
+    F1=F2=F3=F.den=0
+    for (w in 0:k){
+      F1 = F1 + F.base(w, n.x, n.y, k)*z1(w, n.x, n.y, k)^2
+      F.den = F.den + F.base(w, n.x, n.y, k)
+      F2 = F2 + F.base(w, n.x, n.y, k)*z1(w, n.x, n.y, k)
+      F3 = F3 + F.base(w, n.x, n.y, k)*z2(w, n.x, n.y, k)
+    }
+    if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
+    return(V = (F1/F.den - F2^2/F.den^2 + F3/F.den)/div.LT)    
   }
-  if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
-  return(V = (F1/F.den - F2^2/F.den^2 + F3/F.den)/div.LT)
 }
 probit.RG <- function(x, y, n.x=length(x), n.y=length(y)){
   mu.x = mean(x); mu.y = mean(y)
@@ -202,15 +204,24 @@ Mee.stat.old <- function(x, y, n.x=length(x), n.y=length(y)) {
 ### new one. replace the old one after validation!!
 Mee.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   AUC.hat.0 <- AUC.hat <- AUC(x, y, n.x, n.y)
-  increment = ifelse(AUC.hat < 0.5, +0.5, -0.5)
-  while (min(AUC.hat,1-AUC.hat)*sqrt(n.x*n.y) < 0.5){
-    y = y + increment
-    AUC.hat = AUC(x, y, n.x, n.y)
+  if (is.na(AUC.hat)) {
+    return(data.frame(AUC.hat=NA, p1=NA, p2=NA, N.J.hat=NA))
+  } else if (n.x*n.y==0) {
+    return(data.frame(AUC.hat=AUC.hat, p1=NA, p2=NA, N.J.hat=NA))
+  } else {
+    k <- 0
+    increment = ifelse(AUC.hat < 0.5, +0.5, -0.5)
+    while (min(AUC.hat,1-AUC.hat)*sqrt(n.x*n.y) < 0.5 & k <= 100){
+      # print(c(AUC.hat, k))
+      k <- k+1
+      y = y + increment
+      AUC.hat = AUC(x, y, n.x, n.y)
+    }
+    p = p.stat(x, y, n.x, n.y)
+    rho.hat = (p-AUC.hat^2)/(AUC.hat-AUC.hat^2)
+    N.J.hat = n.x*n.y/(((n.x-1)*rho.hat$p1 +1)/(1-1/n.y) + ((n.y-1)*rho.hat$p2 + 1 )/(1-1/n.x) )
+    return(data.frame(AUC.hat=AUC.hat.0, p1=p$p1, p2=p$p2, N.J.hat=N.J.hat))    
   }
-  p = p.stat(x, y, n.x, n.y)
-  rho.hat = (p-AUC.hat^2)/(AUC.hat-AUC.hat^2)
-  N.J.hat = n.x*n.y/(((n.x-1)*rho.hat$p1 +1)/(1-1/n.y) + ((n.y-1)*rho.hat$p2 + 1 )/(1-1/n.x) )
-  return(data.frame(AUC.hat=AUC.hat.0, p1=p$p1, p2=p$p2, N.J.hat=N.J.hat))
 }
 V.Mee.old <- function(x, y, n.x=length(x), n.y=length(y), AUC=AUC(x,y,n.x,n.y), LT=FALSE, N.J.hat=NA, sample.var=TRUE) {
   # sample.var is not relevant. for compatibility purpose. (V.Mee is upward biased)

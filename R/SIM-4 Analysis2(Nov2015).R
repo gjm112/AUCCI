@@ -6,7 +6,7 @@ mainplayers = c("Bm", "HM1", "HM2", "NS1", "NW", "NS2", "Mee", "DL", "RG")   #or
 
 ## combining evaluations in a sheet
 msmt = c("CP","LNCP","RNCP","NaN","CIL", "ZWI")
-mi.names=c("complete","pmm","logreg")
+mi.names=c("complete","pmm","logreg","simple","coinflip","adaptive")
 n = c(200,100,50)
 d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n); d4 = 1:length(mi.names)
 
@@ -19,7 +19,7 @@ names(agreg.table) = c("theta","phi","rho","n","MI","measure",CI.methods)
 rownames(agreg.table) = NULL
 
 index=1; increment=length(msmt)
-for (i in d1) {         #i: theta*phi
+foreach (i in d1) {         #i: theta*phi
   th = round(param1$alphabet$theta[i],4); ph = param1$alphabet$phi[i]
   for (j in d2) {       #j: rho
     rh = param1$gamma$rho[j]

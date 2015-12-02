@@ -62,9 +62,9 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
     n.y = n - n.x
     mi.stat$theta.LT = logit(mi.stat$theta,LT=LT)
     mi.stat$div.LT = ifelse(LT,(mi.stat$theta[i]*(1-mi.stat$theta[i]))^2,1)
-    mean.MI = mean(mi.stat$theta)
-    mean.MI.LT = mean(mi.stat$theta.LT)
-    var.B.LT = var(mi.stat$theta.LT)    # => Erase when not necessary any more after using funtion Rubin
+    mean.MI = mean(mi.stat$theta, na.rm=TRUE)
+    mean.MI.LT = mean(mi.stat$theta.LT, na.rm=TRUE)
+    var.B.LT = var(mi.stat$theta.LT, na.rm=TRUE)    # => Erase when not necessary any more after using funtion Rubin
     
   }
   
@@ -85,10 +85,14 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
       if (length(mi.var.fin) > 0) {
         Rubin = Rubin(W=mean(mi.var.fin), MI=mi.stat$theta.LT, alpha=alpha, print.nu = TRUE)
         var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
-        nu.LT = Rubin$nu             # degree of freedom for MI
-        if (is.na(nu.LT) & var.MI.LT==0) {nu.LT=Inf}
-        CI.LT = CI.base(mean.MI.LT, var.MI.LT, alpha, qt, df=nu.LT)    # logit scale (will back-transform in the end)
-        CI = expit(CI.LT, LT=LT)
+        if (is.na(var.MI.LT)) {
+          CI <- CI.LT <- c(NA,NA)
+        } else {
+          nu.LT = Rubin$nu             # degree of freedom for MI
+          if (is.na(nu.LT) & var.MI.LT==0) {nu.LT=Inf}
+          CI.LT = CI.base(mean.MI.LT, var.MI.LT, alpha, qt, df=nu.LT)    # logit scale (will back-transform in the end)
+          CI = expit(CI.LT, LT=LT)
+        }
       } else {
         CI.LT <- CI <- c(NA,NA)
       }
@@ -100,13 +104,18 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
       if (score.MI == "fixed.r" & LT==FALSE) {  #if n.x==1, var is not estimable, make it population var to estimate r.
         W = V.HM(AUC=mean.MI, n.x=n.x, n.y=n.y, LT=LT, NC=FALSE, sample.var=ifelse(n.x==1,FALSE,TRUE))
         r = Rubin(W=W, MI=mi.stat$theta.LT, alpha=alpha, print.r=TRUE)$r
-        if (all(mi.stat$theta.LT==1)) {r=1}  #if all theta_(i)'s are 1, W=0, r=undefined, V=0
+        mi.theta.fin = mi.stat$theta.LT[is.finite(mi.stat$theta.LT)]
+        if (length(mi.theta.fin)==0) {
+          CI.LT <- CI <- c(NA,NA)
+        } else {
+        if (all(mi.theta.fin==1)) {r=1}  #if all theta_(i)'s are 1, W=0, r=undefined, V=0
         if (CI.method == "NS1") {
           CI = polyroot2(HM.coef,AUC.hat=mean.MI, n.x=n.x, n.y=n.y, NC=FALSE, alpha=alpha, r=r)
         } else if (CI.method == "NS2") {
           CI = polyroot2(HM.coef,AUC.hat=mean.MI, n.x=n.x, n.y=n.y, NC=TRUE, alpha=alpha, r=r)
         } else if (CI.method == "Mee") {
           CI = polyroot2(Mee.coef,AUC.hat=mean.MI, N.J.hat=mean(mi.stat$N.J.hat, na.rm=TRUE), alpha=alpha, r=r)
+        }
         }
       }
       else {

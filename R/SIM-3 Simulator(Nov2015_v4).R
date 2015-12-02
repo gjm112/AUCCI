@@ -2,12 +2,8 @@
 
 ########################################
 library(foreach) # foreach
-#library(doMC)    # %dopar% in foreach
-#registerDoMC(cores=4)
 library(doSNOW)
 library(tcltk)
-cl <- makeSOCKcluster(3)
-registerDoSNOW(cl)
 
 exp.packages = c("foreach","MASS", "mice", "norm", "rootSolve", "sn", "tcltk")
 exp.functions = names(which(eapply(globalenv(), class) == "function"))
@@ -54,9 +50,10 @@ R = 30
 
 n.sim=10000
 bgn <- Sys.time()
+
 # setting dimensions and seed
 d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n)
-d1 <- 5:6
+d1 = 1:3
 d123 <- length(d1)*length(d2)*length(d3)
 
 ## steps
@@ -64,60 +61,18 @@ imputation=TRUE    # run MI and estimates?
 Dir=FALSE          # run Direct approaches?
 #save.Est=FALSE    # save Inferences(Estimations)?
 na.rm = TRUE       # for evaluation
+parallel = TRUE    # %dopar% or %do%?
+# if parallel, should change %do% -> %dopar%, and "<<-" -> "<-" (exceptions: debug.*, count)
 
 ## 2.3.2 Simulator #######################################################################
 
 ## 2.3.2.1 sim.by.k functionalized part under i, j, h
-
-# Those below are global variables, and input and output variables: 
-# They are the final results but are not explicitly returned.
-# High level assigning operator (<<-) is used.
-# temp.est, temp.estMI, temp.estDir.BCA, temp.estDir.Wald
-sim.by.k = function(k, h, n,
-                    alpha0, alpha1, beta0, beta1, beta2, beta3, sig, q1, q2, q3, q4, gamma, rho, mu.V, Sigma, 
-                    CI.method, alpha,
-                    imputation, MI.method, m, Dir, Dir.method, R) {
-  # A-Gen. Data generation(from 2.)
-  temp <- datagenerator(n=n[h], alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, option="VDTR")
-  # A-Est: Inferences (complete datasets)
-  temp.est[k,] <<- CI.i(temp,fun=AUCCI, CI.method=CI.method, alpha=alpha, type="landscape2")
-  
-  # B. Imputation
-  if (imputation) {
-    # B-Imp
-    temp.MI <- list();  
-    nonimputable <- lapply(MI.method,function(x) FALSE); names(nonimputable) <- MI.method
-    for (l in MI.method) {
-      if (l == "pmm" |l == "logreg") { 
-        temp.MI[[l]] <- mice2(data=temp[,-1], method=l, m=m, printFlag=FALSE)
-        if (is.na(temp.MI[[l]][[1]][[1]][[1]])) { nonimputable[[l]] = TRUE}
-      }
-      else if (l == "simple"|l == "coinflip"|l == "adaptive") {
-        temp.MI[[l]] <- MI.norm(data=temp[,-1], rounding=l, m=m, showits=FALSE)
-      }
-      else {stop("Wrong MI method!")}
-    }
-    
-    # B-Est (Inference on incomplete datasets with MI)
-    for (l in MI.method) {
-      if (nonimputable[[l]]) {
-        temp.estMI[[l]][k,] <<- NA
-      } else {
-        temp.estMI[[l]][k,] <<- CI.i(temp.MI[[l]], fun=AUCCI.MI, CI.method=CI.method, m=m, alpha=alpha, type="landscape2")
-      }
-    }
-  } #imputation==TRUE
-  
-  # C. Direct Approach (Inferences on incomplete datasets with Direct methods(Bootstrapping))
-  if (Dir) {
-    temp.boot <- AUCCI.boot(data=temp, R=R, CI.method=Dir.methods, alpha=alpha, type="landscape2")
-    temp.estDir.BCA[k,] <<- cbind("-",temp.boot$CI)
-    temp.estDir.Wald[k,] <<- cbind("-",temp.boot$CI.Wald)
-  } #Dir==TRUE
-}
+debug.ijh <- rep(NA,3)
+debug.l <- debug.k <- NA
 
 sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method, alpha, n,
                        imputation, MI.method, Dir, m, Dir.method, R) {
+  debug.ijh <<- c(i,j,h)
   
   ### 1. basic setting
   # param(i)
@@ -135,51 +90,83 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
   
   ### 2. Empty shells that is outer than k (1:n.sim) 
   # for A-Est: Complete data
-  temp.est <<- as.data.frame(matrix(NA,n.sim,(length(CI.methods)*2+1)))
-  names(temp.est) <<- c("AUC.hat",paste0(rep(CI.methods,each=2),c(".lb",".ub")))
+  temp.est <- as.data.frame(matrix(NA,n.sim,(length(CI.methods)*2+1)))
+  names(temp.est) <- c("AUC.hat",paste0(rep(CI.methods,each=2),c(".lb",".ub")))
   
   # for B-Est: Imputations
-  temp.estMI <<- lapply(MI.method, function(l) {a <- as.data.frame(matrix(NA,n.sim,(length(CI.methods)*2+1))) 
+  temp.estMI <- lapply(MI.method, function(l) {a <- as.data.frame(matrix(NA,n.sim,(length(CI.methods)*2+1))) 
                                                names(a) <- c("AUC.hat",paste0(rep(CI.methods,each=2),c(".lb",".ub"))); return(a)})
-  names(temp.estMI) <<- MI.method
+  names(temp.estMI) <- MI.method
   
   # for C-Dir: Direct Approaches
-  temp.estDir.BCA <<- temp.estDir.Wald <<-  as.data.frame(matrix(NA,n.sim,(length(Dir.methods)*2+1)))
-  names(temp.estDir.BCA) <<- names(temp.estDir.Wald) <<- c("AUC.hat",paste0(rep(Dir.methods,each=2),c(".lb",".ub")))
+  temp.estDir.BCA <- temp.estDir.Wald <-  as.data.frame(matrix(NA,n.sim,(length(Dir.methods)*2+1)))
+  names(temp.estDir.BCA) <- names(temp.estDir.Wald) <- c("AUC.hat",paste0(rep(Dir.methods,each=2),c(".lb",".ub")))
   
   # for progressbar
-  pbar <- function(n.sim, i, j, h, d123){
-    function(...) {
-      count <<- count + 1
-      #pb.text <- paste0("Data+",ifelse(imputation,"MI+",""),ifelse(Dir,"Dir+",""),"Est|")
-      #pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d123, pb.text), style=3)
-      #setTxtProgressBar(pb,count)
-      if (k %% 300 == 0) {write.csv(NA, paste0("progress/progress(",paste0(c(i,j,h,k),collapse="-"),")",format(Sys.time(), "%b%d-%H%M%S"),".csv"))}
-      if (count %% 1000 == 0) {
-        progress = count / (d123*n.sim)
-        elapsed = Sys.time() - bgn
-        expected = bgn + elapsed/progress
-        write.csv(NA, paste0("progress/Expected(as of ",format(Sys.time(), "%b%d-%H%M"),") is ",format(expected, "%b%d-%H%M"),".csv"))
-      }
-      #Sys.sleep(0.01)
-      #flush.console()
-      #c(...)
-    }
-  }
+  
   
   #CI.method=CI.method, alpha=alpha,
   #imputation=imputation, MI.method=MI.method, m=m, Dir=Dir, Dir.method=Dir.method, R=R)
   
   # Estimation: simulation by k
-  b <- foreach (k=1:n.sim, .combine=pbar(n.sim, i,j,h,d123)) %do% {  # can't do dopar. dopar doesn't produce values for temp.est etc
-    # setTxtProgressBar(pb,k)
-    # sim.by.k function is manipulating the data by using High level assigning operator (<<-): 
-    # temp.est, temp.estMI, temp.estDir.BCA, temp.estDir.Wald
-    sim.by.k (k=k, h=h, n=n,
-              alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, 
-              sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, rho=rho, mu.V=mu.V, Sigma=Sigma,
-              CI.method=CI.method, alpha=alpha,
-              imputation=imputation, MI.method=MI.method, m=m, Dir=Dir, Dir.method=Dir.method, R=R)
+  for (k in 1:n.sim) {
+    debug.k <<- k
+    # A-Gen. Data generation(from 2.)
+    temp <- datagenerator(n=n[h], alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, option="VDTR")
+    # A-Est: Inferences (complete datasets)
+    temp.est[k,] <- CI.i(temp,fun=AUCCI, CI.method=CI.method, alpha=alpha, type="landscape2")
+    
+    ####### counter ######
+    count <<- count + 1
+    #pb.text <- paste0("Data+",ifelse(imputation,"MI+",""),ifelse(Dir,"Dir+",""),"Est|")
+    #pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d123, pb.text), style=3)
+    #setTxtProgressBar(pb,count)
+    if (k %% 300 == 0) {write.csv(NA, paste0("progress/progress(",paste0(c(i,j,h,k),collapse="-"),")",format(Sys.time(), "%b%d-%H%M%S"),".csv"))}
+    if (count %% 1000 == 0) {
+      progress = count / (d123*n.sim)
+      elapsed = Sys.time() - bgn
+      expected = bgn + elapsed/progress
+      write.csv(NA, paste0("progress/Expected(as of ",format(Sys.time(), "%b%d-%H%M"),") is ",format(expected, "%b%d-%H%M"),".csv"))
+    }
+    #Sys.sleep(0.01)
+    #flush.console()
+    ####### counter ######
+    
+    # B. Imputation
+    if (imputation) {
+      # B-Imp
+      temp.MI <- list();  
+      nonimputable <- lapply(MI.method,function(x) FALSE); names(nonimputable) <- MI.method
+      for (l in MI.method) {
+        debug.l <<- c(l,"temp.MI")
+        if (l == "pmm" |l == "logreg") { 
+          temp.MI[[l]] <- mice2(data=temp[,-1], method=l, m=m, printFlag=FALSE)
+          if (is.na(temp.MI[[l]][[1]][[1]][[1]])) { nonimputable[[l]] = TRUE}
+        }
+        else if (l == "simple"|l == "coinflip"|l == "adaptive") {
+          temp.MI[[l]] <- MI.norm(data=temp[,-1], rounding=l, m=m, showits=FALSE)
+        }
+        else {stop("Wrong MI method!")}
+      }
+      
+      # B-Est (Inference on incomplete datasets with MI)
+      for (l in MI.method) {
+        debug.l <<- c(l,"temp.estMI")
+        if (nonimputable[[l]]) {
+          temp.estMI[[l]][k,] <- NA
+        } else {
+          temp.estMI[[l]][k,] <- CI.i(temp.MI[[l]], fun=AUCCI.MI, CI.method=CI.method, m=m, alpha=alpha, type="landscape2")
+        }
+      }
+    } #imputation==TRUE
+    debug.l <<- c(l,NA)
+    
+    # C. Direct Approach (Inferences on incomplete datasets with Direct methods(Bootstrapping))
+    if (Dir) {
+      temp.boot <- AUCCI.boot(data=temp, R=R, CI.method=Dir.methods, alpha=alpha, type="landscape2")
+      temp.estDir.BCA[k,] <- cbind("-",temp.boot$CI)
+      temp.estDir.Wald[k,] <- cbind("-",temp.boot$CI.Wald)
+    } #Dir==TRUE
   }
   
   # storing A ~ C-2
@@ -216,8 +203,8 @@ count <- 1   # for time checking in dopar
 pb <- txtProgressBar(min=0, max = length(d1)*length(d2), style=3)
 for (i in d1) { 
   for (j in d2) {
-    cl <- makeSOCKcluster(3)
-    registerDoSNOW(cl)
+    if (parallel) {cl <- makeSOCKcluster(4)}      # for parallel
+    if (parallel) {registerDoSNOW(cl)}            # for parallel
     print(c(i,j, paste0("out of ", length(d1),"x", length(d2))))
     sim.data  <- temp.d1 <- temp.d2 <- list()
     bgn <- Sys.time()
@@ -225,13 +212,11 @@ for (i in d1) {
     setTxtProgressBar(pb,(i-1)*length(d2)+j)
     temp.d3  <- foreach (h=d3, .packages=exp.packages, .export=exp.functions2) %dopar% {
       set.seed(i*j*h*100)
-      # sim.by.k function is manipulating the data by using High level assigning operator (<<-): 
-      # temp.est, temp.estMI, temp.estDir.BCA, temp.estDir.Wald
       sim.by.ijh (i=i, j=j, h=h, d123=d123, pb=pb, pb.text=pb.text, param=param1, mu.V=mu.V, Sigma=Sigma, CI.method=CI.methods, alpha=alpha, n=n,
                   imputation=imputation, MI.method = MI.methods[,"methods"], 
                   Dir=Dir, m=m, Dir.method=Dir.methods, R=R)
     }
-    
+    if (parallel) {stopCluster(cl)}               # for parallel
     saveRDS(temp.d3, paste0("sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
     # Time stat
     elapsed = Sys.time()-bgn
@@ -239,10 +224,8 @@ for (i in d1) {
     print(paste0("bgn: ", format(bgn,"%m/%d %H:%M"), ", elapsed: ", round(elapsed,1), " min's, expected: ", format(expected,"%m/%d %H:%M"), ", i: ", paste(i,"in", length(d1)), ", j: ", paste(j,"in", length(d2)) ))
     
     temp.d2[[j]] <- temp.d3
-    } # j in d2
+  } # j in d2
   temp.d1[[i]] <- temp.d2
 } # i in d1
-sim.data = temp.d1; rm(temp.d1,temp.d2)
-
-
+# sim.data = temp.d1; rm(temp.d1,temp.d2)
 
