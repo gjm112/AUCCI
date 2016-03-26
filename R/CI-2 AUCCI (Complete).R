@@ -118,8 +118,21 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
   else if (CI.method == "DL") {
     V.LT = V.DeLong(x, y, n.x, n.y, A, LT=LT,...)
     CI.LT = CI.base(A.LT,V.LT,alpha)
-  }  
+  }
   
+  else if (CI.method == "RJ"){  # logit (Rubin) with Jeffrey's prior
+    Meestat <- Mee.stat(x,y)
+    N.total <- Meestat$N.J.hat
+    AUC.hat <- Meestat$AUC.hat
+    N.success <- AUC.hat * N.total
+    AUC.tilde <- (N.success + .5) / (N.total + 1)
+    den <- (N.total + 1) * AUC.tilde * (1 - AUC.tilde)
+    V.LT = 1 / den 
+    CI.LT = CI.base(logit(AUC.tilde), V.LT, alpha)
+    LT = TRUE      # fixing LT = TRUE only.
+    A = AUC.tilde
+  }
+
   ##### WilsonScore and ClopperPearson CI.methods are excluded from this study ##########
   else if (CI.method == "WS") {
     z.a2 = qnorm(1-alpha/2)

@@ -6,7 +6,7 @@ library(rootSolve)  # for Newton-Raphson Method (0.2.4)
 library(sn)         # for Owen's T-function in Double Gaussian Method (0.2.15)
 
 # CI methods :    ref to 2-3.[SIM] Simulator, 3.evaluation
-CI.methods = c("Bm", "HM1", "HM2", "NS1", "NW", "NS2", "Mee", "DL", "RG", "CM", "DB", "DG")
+CI.methods = c("Bm", "HM1", "HM2", "NS1", "NW", "NS2", "Mee", "DL", "RG", "CM", "DB", "DG", "RJ")
 ### Descriptions
 # Bm : Bamber
 # HM1 : Hanley-McNeil 1 (Wald, nonparametric var)
