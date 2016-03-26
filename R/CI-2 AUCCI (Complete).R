@@ -126,8 +126,7 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
     AUC.hat <- Meestat$AUC.hat
     N.success <- AUC.hat * N.total
     AUC.tilde <- (N.success + .5) / (N.total + 1)
-    den <- (N.total + 1) * AUC.tilde * (1 - AUC.tilde)
-    V.LT = 1 / den 
+    V.LT = 1 / ((N.total + 1) * AUC.tilde * (1 - AUC.tilde))
     CI.LT = CI.base(logit(AUC.tilde), V.LT, alpha)
     LT = TRUE      # fixing LT = TRUE only.
     A = AUC.tilde

@@ -27,11 +27,11 @@ sig = 1
 # free parameters: alpha0(for phi), beta1(for theta)
 # To estimate parameters that satisfy specific phi and theta,
 # refer to 2-2-1 parameterfinder.R(beta1) and 2-2-2 alphafinder.R(alpha0).
-param1 = list(alphabet = data.frame(phi = rep(c(.5,.7), each=3), 
-                                    theta = c(0.7999914248, 0.89999851, 0.950002331, 0.800002545, 0.899999218, 0.950000849), 
-                                    theta.SE =c(5.80868E-06,4.09076E-06,2.76121E-06,7.79383E-06, 5.34159E-06, 3.42365E-06) ,
-                                    alpha0 = rep(c(0,1.6111), each=3), 
-                                    beta1=c(0.8089, 1.4486, 1.97674,.8319,1.47286,2.00192)), 
+param1 = list(alphabet = data.frame(phi = rep(c(.5,.7), each=4), 
+                                    theta = c(0.7999914248, 0.89999851, 0.950002331, 0.9900000165, 0.800002545, 0.899999218, 0.950000849, 0.989999545), 
+                                    theta.SE =c(5.80868E-06, 4.09076E-06, 2.76121E-06, 1.0662E-06, 7.79383E-06, 5.34159E-06, 3.42365E-06, 1.15113E-06),
+                                    alpha0 = rep(c(0,1.6111), each=4), 
+                                    beta1=c(0.8089, 1.4486, 1.97674, 2.96704, .8319, 1.47286, 2.00192, 2.9939)), 
               gamma = data.frame(q1 = c(.7, .8), q2 = c(.8, .9), q3=c(.7, .8), q4=c(.8, .9), gamma = c(.7, .8), rho = c(.5, .7)))
 # alpha0 = 0 for phi==0, alpha0 = 1.6111 for phi==.7
 # q3= q1, q4= q2: MAR settings
@@ -53,7 +53,7 @@ bgn <- Sys.time()
 
 # setting dimensions and seed
 d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n)
-d1 = 1:3
+d1 = c(4,8)
 d123 <- length(d1)*length(d2)*length(d3)
 
 ## steps
