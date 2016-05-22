@@ -23,6 +23,10 @@ names(result) = c("theta","phi","rho","n","MI","measure",CI.methods)
 rownames(result) = NULL
 
 index=1; increment=length(msmt)
+pointest = as.data.frame(matrix(NA,288,6)) # 288 = theta(4)*phi(2)*rho(2)*n(3)*MI(6), 6: th,ph,rh,n,MI,AUC.hat
+names(pointest) = c("AUC","phi","rho","n","MI","AUC.hat")
+mmmm = 1 # row index for pointest
+
 for (i in d1) {         #i: theta*phi
   th = round(param1$alphabet$theta[i],4); ph = param1$alphabet$phi[i]
   for (j in d2) {       #j: rho
@@ -45,19 +49,32 @@ for (i in d1) {         #i: theta*phi
       tmp[[h]]$eval[[4]][5,] = round(apply(tmp[[h]]$est.MI$simple[,ubcol] - tmp[[h]]$est.MI$simple[,lbcol], 2, mean, na.rm=TRUE),4)
       tmp[[h]]$eval[[5]][5,] = round(apply(tmp[[h]]$est.MI$coinflip[,ubcol] - tmp[[h]]$est.MI$coinflip[,lbcol], 2, mean, na.rm=TRUE),4)
       tmp[[h]]$eval[[6]][5,] = round(apply(tmp[[h]]$est.MI$adaptive[,ubcol] - tmp[[h]]$est.MI$adaptive[,lbcol], 2, mean, na.rm=TRUE),4)
-    }
+      }
     
     for (h in d3) {     #h: n
       nh = n[h]
+      
+      # point estimates
+      val <- vector(length=6)
+      val[1] <- mean(tmp[[h]]$est.com$AUC.hat, na.rm = T)
+      val[2] <- mean(tmp[[h]]$est.MI$pmm$AUC.hat, na.rm = T)
+      val[3] <- mean(tmp[[h]]$est.MI$logreg$AUC.hat, na.rm = T)
+      val[4] <- mean(tmp[[h]]$est.MI$simple$AUC.hat, na.rm = T)
+      val[5] <- mean(tmp[[h]]$est.MI$coinflip$AUC.hat, na.rm = T)
+      val[6] <- mean(tmp[[h]]$est.MI$adaptive$AUC.hat, na.rm = T)
+      
       for (l in d4) {   #l: mi methods
         mh = mi.names[l]
         row.range = index:(index+increment-1)
         col.range = 7:len.col
-        result[row.range,1:6] =  matrix(c(rep(c(th,ph,rh,nh,mh),each=length(msmt)),msmt),length(msmt))
-        
+        result[row.range,1:6] = matrix(c(rep(c(th,ph,rh,nh,mh),each=length(msmt)),msmt),length(msmt))
         result[row.range,col.range] = tmp[[h]]$eval[[l]]
         index=index+increment  # for next
-      } 
+        
+        pointest[mmmm,] = c(th,ph,rh,nh,mh, val[l])
+        mmmm <- mmmm + 1
+        
+      }
     }
   }
 }
@@ -65,12 +82,24 @@ result$n <- as.numeric(result$n)
 head(result)
 result[result$measure=="CIL" & result$Bm >=1,]
 
+#point estimates for bias check
+pointest$MI <- as.factor(pointest$MI)
+pointest$MI = factor(pointest$MI,levels(pointest$MI)[c(3,5,4,1,6,2)])
+levels(pointest$MI) <- c("complete", "PMM", "LR", "NORM", "NORM(simple)", "NORM(coinflip)")
+pointest$AUC.hat <- as.numeric(pointest$AUC.hat)
+head(pointest)
+pointest.avg <- aggregate(AUC.hat ~ AUC + MI, mean, data=pointest)
+ggplot(pointest.avg[pointest.avg$MI %in% c("complete", "PMM", "LR", "NORM"),], aes(MI, AUC.hat)) + geom_point(aes(colour = factor(MI)), size = 4) + facet_grid(. ~ AUC, labeller=label_both) + 
+  geom_abline(intercept = 0.8, slope=0) + geom_abline(intercept = 0.9, slope=0) + 
+  geom_abline(intercept = 0.95, slope=0) + geom_abline(intercept = 0.99, slope=0) + 
+  theme(axis.text.x = element_blank(),axis.ticks = element_blank()) +
+  ylab("Average AUC estimate")
 
 ## reshaping: wide to long
 rst = melt(result, id =c("theta","phi","rho","n","MI","measure"))
 names(rst)[7] = "CI.method"
 rst$CI.method <- as.factor(rst$CI.method)
-rst <- dcast(rst, phi + rho + n + MI + measure + CI.method ~ theta)
+rst <- dcast(rst, phi + rho + n + MI + measure + CI.method ~ theta, mean)
 names(rst)[7:10] <- paste0("v.",names(rst)[7:10])
 
 ## aggregating across phi, rho, n:  table(CI,MI,measure x theta)
@@ -185,17 +214,82 @@ aggregate(value~CI.method, FUN=MSE,data=result.Wald)
 aggregate(value~CI.method, FUN=mean,data=result.Wald)
 
 
-## rst3
-rst5.CP = rst2[rst2$measure == "CP",-5]
-head(rst5.CP)
+## rst5
+rst2$MI <- as.factor(rst2$MI)
+rst2$MI = factor(rst2$MI,levels(rst2$MI)[c(2,4,3,1)])
+rst5 = rst2
+# reshaping: wide to long
+rst5 <- reshape(rst5, varying=c("v.0.8","v.0.9","v.0.95","v.0.99"), direction="long", idvar=c("phi","rho","n","MI","CI.method", "measure"), sep=".0")
+rownames(rst5) <- NULL
+names(rst5)[7] = "theta"
+names(rst5)[8] = "value"
+levels(rst5$MI) <- c("complete", "PMM", "LR", "NORM")
+# rst5[,9] <- paste(rst5$MI, rst5$CI.method, sep="-")
+# names(rst5)[9] = "method"
 
-## reshaping: wide to long
-rst5.CP<-reshape(rst5.CP, varying=c("v.0.8","v.0.9","v.0.95","v.0.99"), direction="long", idvar=c("phi","rho","n","MI","CI.method"), sep=".0")
-names(rst5.CP)[6] = "theta"
-names(rst5.CP)[7] = "CP"
-rownames(rst5.CP) <- NULL
-rst5.CP[,8] <- paste(rst5.CP$MI, rst5.CP$CI.method, sep="-")
 
-rst$CI.method <- as.factor(rst$CI.method)
-rst <- dcast(rst, phi + rho + n + MI + measure + CI.method ~ theta)
-names(rst)[7:10] <- paste0("v.",names(rst)[7:10])
+rst5[, c("phi", "rho", "theta", "MI", "CI.method", "n")] <- 
+  lapply(rst5[, c("phi", "rho", "theta", "MI", "CI.method", "n")], as.factor)
+rst5.phrh <- aggregate(value~phi+rho+theta+MI+CI.method+measure, FUN=mean,data=rst5) # across n
+rst5.n <- aggregate(value~n+theta+MI+CI.method+measure, FUN=mean,data=rst5) # across phi and rho
+
+p.CP <- ggplot(rst5.phrh[rst5.phrh$measure == "CP",], aes(theta, value, group = CI.method)) + 
+  geom_line(aes(color=CI.method)) +
+  geom_abline(intercept = .95, slope = 0) +
+  geom_point(aes(shape=CI.method, color=CI.method)) + 
+  facet_grid(phi+rho ~ MI, labeller=label_both, scales="free_y", space="free_y") +
+  # ylim(0.7,1) +
+  xlab("AUC") +
+  ylab("CP") +
+  # ggtitle("The average coverage probability by each method") +
+  scale_y_continuous(minor_breaks = seq(0.5, 1, 0.05)) +
+  theme_bw()  +
+  theme(legend.position="bottom")
+  # geom_text(aes(theta, CP, label=paste("phi & rho", labs), group=NULL), size = 4, color = "grey50", data=dat, parse = T)
+p.CP
+
+
+p.CIL <- ggplot(rst5.phrh[rst5.phrh$measure == "CIL",], aes(theta, value, group = CI.method)) + 
+  geom_line(aes(color=CI.method)) +
+  # geom_abline(intercept = .95, slope = 0) +
+  geom_point(aes(shape=CI.method, color=CI.method)) + 
+  # facet_grid(phi+rho ~ MI, labeller=label_both, scales="free_y", space="free_y") +
+  facet_grid(phi+rho ~ MI, labeller=label_both) +
+  xlab("AUC") +
+  ylab("CIL") +
+  # ggtitle("The average coverage probability by each method") +
+  scale_y_continuous(minor_breaks = seq(0.5, 1, 0.05)) +
+  theme_bw()  +
+  theme(legend.position="bottom")
+p.CIL
+
+
+p.CP.n <- ggplot(rst5.n[rst5.n$measure == "CP",], aes(theta, value, group = CI.method)) + 
+  geom_line(aes(color=CI.method)) +
+  geom_abline(intercept = .95, slope = 0) +
+  geom_point(aes(shape=CI.method, color=CI.method)) + 
+  facet_grid(n ~ MI, labeller=label_both, scales="free_y", space="free_y") +
+  # ylim(0.7,1) +
+  xlab("AUC") +
+  ylab("CP") +
+  # ggtitle("The average coverage probability by each method") +
+  scale_y_continuous(minor_breaks = seq(0.5, 1, 0.05)) +
+  theme_bw()  +
+  theme(legend.position="bottom")
+# geom_text(aes(theta, CP, label=paste("phi & rho", labs), group=NULL), size = 4, color = "grey50", data=dat, parse = T)
+p.CP.n
+
+
+p.CIL.n <- ggplot(rst5.n[rst5.n$measure == "CIL",], aes(theta, value, group = CI.method)) + 
+  geom_line(aes(color=CI.method)) +
+  # geom_abline(intercept = .95, slope = 0) +
+  geom_point(aes(shape=CI.method, color=CI.method)) + 
+  # facet_grid(n ~ MI, labeller=label_both, scales="free_y", space="free_y") +
+  facet_grid(n ~ MI, labeller=label_both) +
+  xlab("AUC") +
+  ylab("CIL") +
+  # ggtitle("The average coverage probability by each method") +
+  scale_y_continuous(minor_breaks = seq(0.5, 1, 0.05)) +
+  theme_bw()  +
+  theme(legend.position="bottom")
+p.CIL.n

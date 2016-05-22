@@ -61,7 +61,7 @@ imputation=TRUE    # run MI and estimates?
 Dir=FALSE          # run Direct approaches?
 #save.Est=FALSE    # save Inferences(Estimations)?
 na.rm = TRUE       # for evaluation
-parallel = TRUE    # %dopar% or %do%?
+parallel = FALSE    # %dopar% or %do%?
 # if parallel, should change %do% -> %dopar%, and "<<-" -> "<-" (exceptions: debug.*, count)
 
 ## 2.3.2 Simulator #######################################################################
@@ -210,12 +210,22 @@ for (i in d1) {
     bgn <- Sys.time()
     # progress(h)
     setTxtProgressBar(pb,(i-1)*length(d2)+j)
-    temp.d3  <- foreach (h=d3, .packages=exp.packages, .export=exp.functions2) %dopar% {
-      set.seed(i*j*h*100)
-      sim.by.ijh (i=i, j=j, h=h, d123=d123, pb=pb, pb.text=pb.text, param=param1, mu.V=mu.V, Sigma=Sigma, CI.method=CI.methods, alpha=alpha, n=n,
-                  imputation=imputation, MI.method = MI.methods[,"methods"], 
-                  Dir=Dir, m=m, Dir.method=Dir.methods, R=R)
+    if (parallel) {
+      temp.d3  <- foreach (h=d3, .packages=exp.packages, .export=exp.functions2) %dopar% {
+        set.seed(i*j*h*100)
+        sim.by.ijh (i=i, j=j, h=h, d123=d123, pb=pb, pb.text=pb.text, param=param1, mu.V=mu.V, Sigma=Sigma, CI.method=CI.methods, alpha=alpha, n=n,
+                    imputation=imputation, MI.method = MI.methods[,"methods"], 
+                    Dir=Dir, m=m, Dir.method=Dir.methods, R=R)
+      }      
+    } else {
+      temp.d3  <- foreach (h=d3, .packages=exp.packages, .export=exp.functions2) %do% {
+        set.seed(i*j*h*100)
+        sim.by.ijh (i=i, j=j, h=h, d123=d123, pb=pb, pb.text=pb.text, param=param1, mu.V=mu.V, Sigma=Sigma, CI.method=CI.methods, alpha=alpha, n=n,
+                    imputation=imputation, MI.method = MI.methods[,"methods"], 
+                    Dir=Dir, m=m, Dir.method=Dir.methods, R=R)
+      }
     }
+
     if (parallel) {stopCluster(cl)}               # for parallel
     saveRDS(temp.d3, paste0("sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
     # Time stat
