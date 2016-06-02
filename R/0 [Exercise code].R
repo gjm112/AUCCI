@@ -1,9 +1,4 @@
-<<<<<<< HEAD
 ###### Pilot test codes ########
-=======
-####### Great Greg #######
-####### Pilot test codes ########
->>>>>>> 460420c2c04840bbb75e2bf431c237a952cab843
 ### 2-1 basic param & data  #####################################################
 ## parameters for pilot test 
 {
