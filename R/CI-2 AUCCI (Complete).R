@@ -17,7 +17,7 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
   x = data[data[,disease]==0, marker]
   y = data[data[,disease]==1, marker]
   n.x = length(x) ; n.y = length(y) ; n = n.x + n.y
-  A = AUC(x, y, n.x, n.y)
+  A = AUC(x, y, n.x, n.y, ...)
   A.LT = logit(A, LT=LT)
   start = c( A/2, (A+1)/2)
   start.LT = logit(start, LT=LT)

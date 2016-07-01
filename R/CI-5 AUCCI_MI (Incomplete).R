@@ -50,7 +50,7 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
     for (i in 1:m) {
       temp = data2xy(data.comp[[i]],disease="diseaseR", marker="marker")
       x = temp$x ; y = temp$y
-      mi.stat$theta[i] = AUC(x, y)
+      mi.stat$theta[i] = AUC(x, y,...)
       n.x.vec[i] = length(x)
       if ("Mee" %in% CI.method) {
         mi.stat$N.J.hat[i] = Mee.stat(x, y)$N.J.hat
