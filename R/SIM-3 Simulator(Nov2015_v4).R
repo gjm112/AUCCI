@@ -53,7 +53,7 @@ bgn <- Sys.time()
 
 # setting dimensions and seed
 d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n)
-d1 = c(4,8)
+#d1 = c(4,8)
 d123 <- length(d1)*length(d2)*length(d3)
 
 ## steps
@@ -61,7 +61,7 @@ imputation=TRUE    # run MI and estimates?
 Dir=FALSE          # run Direct approaches?
 #save.Est=FALSE    # save Inferences(Estimations)?
 na.rm = TRUE       # for evaluation
-parallel = FALSE    # %dopar% or %do%?
+parallel = TRUE    # %dopar% or %do%?
 # if parallel, should change %do% -> %dopar%, and "<<-" -> "<-" (exceptions: debug.*, count)
 
 ## 2.3.2 Simulator #######################################################################
@@ -202,6 +202,7 @@ count <- 1   # for time checking in dopar
 
 pb <- txtProgressBar(min=0, max = length(d1)*length(d2), style=3)
 for (i in d1) { 
+  if (i == 1) next
   for (j in d2) {
     if (parallel) {cl <- makeSOCKcluster(4)}      # for parallel
     if (parallel) {registerDoSNOW(cl)}            # for parallel
@@ -210,6 +211,7 @@ for (i in d1) {
     bgn <- Sys.time()
     # progress(h)
     setTxtProgressBar(pb,(i-1)*length(d2)+j)
+    
     if (parallel) {
       temp.d3  <- foreach (h=d3, .packages=exp.packages, .export=exp.functions2) %dopar% {
         set.seed(i*j*h*100)
@@ -227,7 +229,7 @@ for (i in d1) {
     }
 
     if (parallel) {stopCluster(cl)}               # for parallel
-    saveRDS(temp.d3, paste0("sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
+    saveRDS(temp.d3, paste0("R/Simdata2/sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
     # Time stat
     elapsed = Sys.time()-bgn
     expected = bgn + elapsed/((i-1)*2+j)*12

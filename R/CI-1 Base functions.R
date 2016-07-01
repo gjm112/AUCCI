@@ -29,36 +29,52 @@ CI.methods = c("Bm", "HM1", "HM2", "NS1", "NW", "NS2", "Mee", "DL", "RG", "CM", 
 CI.base <- function(mu.hat, Var, alpha, dist=qnorm,...) {
   return(mu.hat + c(-1,1) * dist(1-alpha/2,...)*sqrt(Var))
 }
-AUC.classic <- function(x, y, n.x=length(x), n.y=length(y)) {
-  A <- 0; for (i in 1:n.x) { A = A + ( sum(y > x[i]) + sum(y==x[i])/2 ) }
-  return(A = A/ n.x / n.y)
-}
-# new AUC function added with much improved efficiency
-AUC <- function(x, y, n.x=length(x), n.y=length(y), data=NA, disease="disease", marker="marker") {
+# recommended when the biomarker is discrete. (modified June 2016)
+AUC.classic <- function(x, y, n.x=length(x), n.y=length(y), data=NA, disease="disease", marker="marker") {
   if (!is.na(data[1])[1]) {
     xy = data2xy(data, disease=disease, marker=marker)
     x = xy$x
     y = xy$y
+    n.x = length(x); n.y = length(y)
   }
-  predictions = c(x,y)
-  labels = c(rep(0,n.x), rep(1,n.y))
-  pred.order = order(predictions, decreasing = TRUE)
-  predictions.sorted = predictions[pred.order]
-  tp = cumsum(labels[pred.order] == 1)
-  fp = cumsum(labels[pred.order] == 0)
-  dups <- rev(duplicated(rev(predictions.sorted)))
-  tp <- c(0, tp[!dups])
-  fp <- c(0, fp[!dups])
-  #cutoffs <- c(Inf, predictions.sorted[!dups])
-  # excerpted until here from <ROCR> prediction function
-  tpr <- tp[-1]/max(tp)
-  d.fp <- fp[-1] - fp[-length(fp)]
-  d.fpr <- d.fp/max(fp)
-  return(sum(tpr*d.fpr))
+  A <- 0; for (i in 1:n.x) { A = A + ( sum(y > x[i]) + sum(y==x[i])/2 ) }
+  return(A = A/ n.x / n.y)
+}
+
+# new AUC function added with much improved efficiency (but not precise when the biomarker is discrete.)
+# When discrete, use AUC.classic. discrete is TRUE by default. use FALSE when simulating/finding parameters.
+AUC <- function(x, y, n.x=length(x), n.y=length(y), data=NA, disease="disease", marker="marker", discrete=TRUE) {
+  if (discrete) {
+    result = AUC.classic(x=x, y=y, n.x=n.x, n.y=n.y, data=data, disease=disease, marker=marker)
+    return(result)
+  } else {
+    if (!is.na(data[1])[1]) {
+      xy = data2xy(data, disease=disease, marker=marker)
+      x = xy$x
+      y = xy$y
+    }
+    predictions = c(x,y)
+    labels = c(rep(0,n.x), rep(1,n.y))
+    pred.order = order(predictions, decreasing = TRUE)
+    predictions.sorted = predictions[pred.order]
+    tp = cumsum(labels[pred.order] == 1)
+    fp = cumsum(labels[pred.order] == 0)
+    dups <- rev(duplicated(rev(predictions.sorted)))
+    tp <- c(0, tp[!dups])
+    fp <- c(0, fp[!dups])
+    #cutoffs <- c(Inf, predictions.sorted[!dups])
+    # excerpted until here from <ROCR> prediction function
+    tpr <- tp[-1]/max(tp)
+    d.fp <- fp[-1] - fp[-length(fp)]
+    d.fpr <- d.fp/max(fp)
+    return(sum(tpr*d.fpr))
+  }
 }
 
 # data converter: from dataframe to x, y vectors
+# (dropped missing disease status. June 2016)
 data2xy <- function(data, disease="disease", marker="marker") {
+  data = data[!is.na(data[,disease]),]
   x = data[data[,disease]==0, marker]
   y = data[data[,disease]==1, marker]
   return(list(x=x,y=y))
@@ -74,10 +90,11 @@ expit <- function(data, LT=TRUE) {
 
 ## 1.1.2 variance estimators ###########################################################
 # Q.stat for HM and its derivatives
+# (added the half of the tie cases in June 2016)
 Q.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   Q2 <- Q1 <- 0
-  for (i in 1:n.x) {Q1 = Q1 + ( sum(y > x[i]))^2}; Q1 = Q1 /(n.x * n.y^2)  # no ties
-  for (j in 1:n.y) {Q2 = Q2 + ( sum(y[j] > x))^2}; Q2 = Q2 /(n.x^2 * n.y)
+  for (i in 1:n.x) {Q1 = Q1 + ( sum(y > x[i]) + sum(y == x[i])/2 )^2}; Q1 = Q1 /(n.x * n.y^2)  # no ties
+  for (j in 1:n.y) {Q2 = Q2 + ( sum(y[j] > x) + sum(y[j] == x)/2 )^2}; Q2 = Q2 /(n.x^2 * n.y)
   return(data.frame(Q1 = Q1, Q2 = Q2))
 }
 V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1), LT=FALSE, NC=FALSE, sample.var=TRUE, ...) {
