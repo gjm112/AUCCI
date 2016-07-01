@@ -202,7 +202,6 @@ count <- 1   # for time checking in dopar
 
 pb <- txtProgressBar(min=0, max = length(d1)*length(d2), style=3)
 for (i in d1) { 
-  if (i == 1) next
   for (j in d2) {
     if (parallel) {cl <- makeSOCKcluster(4)}      # for parallel
     if (parallel) {registerDoSNOW(cl)}            # for parallel
