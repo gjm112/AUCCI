@@ -201,8 +201,10 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
 count <- 1   # for time checking in dopar
 
 pb <- txtProgressBar(min=0, max = length(d1)*length(d2), style=3)
-for (i in d1) { 
+for (i in d1) {
+  
   for (j in d2) {
+  if (i+j >= 5) {    # break and resume by controlling numbers
     if (parallel) {cl <- makeSOCKcluster(4)}      # for parallel
     if (parallel) {registerDoSNOW(cl)}            # for parallel
     print(c(i,j, paste0("out of ", length(d1),"x", length(d2))))
@@ -235,6 +237,7 @@ for (i in d1) {
     print(paste0("bgn: ", format(bgn,"%m/%d %H:%M"), ", elapsed: ", round(elapsed,1), " min's, expected: ", format(expected,"%m/%d %H:%M"), ", i: ", paste(i,"in", length(d1)), ", j: ", paste(j,"in", length(d2)) ))
     
     temp.d2[[j]] <- temp.d3
+  }
   } # j in d2
   temp.d1[[i]] <- temp.d2
 } # i in d1

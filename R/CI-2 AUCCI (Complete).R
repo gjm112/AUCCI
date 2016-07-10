@@ -24,30 +24,33 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
   
   if (CI.method == "HM1") {
     Q = Q.stat(x, y, n.x, n.y); Q1 = Q$Q1; Q2 = Q$Q2
-    V.LT = V.HM(A, n.x, n.y, Q1, Q2, LT=LT,...)
+    pXY = p.XY(x, y, n.x, n.y)
+    V.LT = V.HM(A, n.x, n.y, Q1, Q2, pXY, LT=LT,...)
     CI.LT = CI.base(A.LT,V.LT,alpha)
   } 
   
   else if (CI.method == "HM2") {
-    V.LT = V.HM(A, n.x, n.y, LT=LT,...)
+    pXY = p.XY(x, y, n.x, n.y)
+    V.LT = V.HM(A, n.x, n.y, pXY=pXY, LT=LT,...)
     CI.LT = CI.base(A.LT,V.LT,alpha)
   }
   
   else if (CI.method == "NS1" | CI.method == "NS2" ) {
     NC = (CI.method == "NS2")
+    pXY = p.XY(x, y, n.x, n.y)
     if (LT==FALSE) {
-      CI = polyroot2(HM.coef, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, r=0, NC=NC)
+      CI = polyroot2(HM.coef, AUC.hat=A, n.x=n.x, n.y=n.y, pXY=pXY, alpha=alpha, r=0, NC=NC)
     } else{
       if (start[2]==1) {
         ub = 1; start = start[1]
-        lb = multiroot2(HMS.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, NC=NC, rtol = 1e-10, atol = 1e-10,...)$root  #original scale    
+        lb = multiroot2(HMS.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, pXY=pXY, alpha=alpha, LT=LT, NC=NC, rtol = 1e-10, atol = 1e-10,...)$root  #original scale    
         CI = c(lb, ub)
       } else {
-        CI = multiroot2(HMS.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, alpha=alpha, LT=LT, NC=NC, rtol = 1e-10, atol = 1e-10,...)$root  #original scale
+        CI = multiroot2(HMS.equation, start, AUC.hat=A, n.x=n.x, n.y=n.y, pXY=pXY, alpha=alpha, LT=LT, NC=NC, rtol = 1e-10, atol = 1e-10,...)$root  #original scale
       }      
     }
     CI.LT = logit(CI, LT=LT)
-    if (variance) {V.LT = V.HM(A, n.x, n.y, LT=LT, NC=NC,...)}
+    if (variance) {V.LT = V.HM(A, n.x, n.y,  pXY=pXY, LT=LT, NC=NC,...)}
   }
   
   else if (CI.method == "NW") {

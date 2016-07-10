@@ -144,7 +144,7 @@ for (MI in MIset) {
   rst4.avg = cbind (rownames(rst4.avg),rownames(rst4.avg),rst4.avg)
   rst4.avg[,1] = c("MI","CI.method",rep("CP",4),rep("CP.MAE",4),rep("LNCP",4),rep("RNCP",4),rep("CIL",4))
   rst4.avg[,2] = c("MI","CI.method",rep(c(.8,.9,.95,.99),5))
-  rownames(rst4.avg) <- NA
+  rownames(rst4.avg) <- NULL
   
   for (MI in MIset) {
     print(xtable(rst4.avg[-1,c(1,2,which(rst4.avg[1,]==MI))], caption=MI), include.rownames = FALSE)
@@ -153,15 +153,17 @@ for (MI in MIset) {
 
 
 
+if(FALSE){
+  rst <- reshape(rst, v.names = "value", idvar = c("phi","rho","n", "MI", "CI.method"), timevar = "theta", direction = "wide")
+ # rst2: Wald, MIset
+ rst2 <- rst[(rst$CI.method %in% Wald) & (rst$MI %in% MIset),]
+ aggregate(cbind(0.8, 0.9, 0.95, 0.99) ~ CI.method + MI, FUN=MAE, data=rst2[rst2$measure=="CP",])
+ 
+ aggregate(data=rst2[rst2$measure=="CP",], 
+           by = data[,c("MI","CI.method","measure")],
+           FUN=mean, na.rm=TRUE)
+}
 
-rst <- reshape(rst, v.names = "value", idvar = c("phi","rho","n", "MI", "CI.method"), timevar = "theta", direction = "wide")
-# rst2: Wald, MIset
-rst2 <- rst[(rst$CI.method %in% Wald) & (rst$MI %in% MIset),]
-aggregate(cbind(0.8, 0.9, 0.95, 0.99) ~ CI.method + MI, FUN=MAE, data=rst2[rst2$measure=="CP",])
-
-aggregate(data=rst2[rst2$measure=="CP",], 
-          by = data[,c("MI","CI.method","measure")],
-          FUN=mean, na.rm=TRUE)
 
 
 ## calculating deviations(Actual CP - Nominal CP)
@@ -195,7 +197,7 @@ for (i in 1:6) { for (j in 1:3) {
   legend(.85, .2, Wald, pch=16, cex=.5, col=1:6)
 }}
 
-plot(result.Wald$value ~ result.Wald$theta, type="l", ylim=c(.9,1), , xlab="theta=.8 .9 .95",)
+plot(result.Wald$value ~ result.Wald$theta, type="l", ylim=c(.9,1),  xlab="theta=.8 .9 .95",)
 for(l in mainplayers) {points(b[,CI.methods[l]], type="l", pch=16, col=l)}
 abline(h=.95, lty=3)
 
@@ -215,9 +217,10 @@ aggregate(value~CI.method, FUN=mean,data=result.Wald)
 
 
 ## rst5
-rst2$MI <- as.factor(rst2$MI)
-rst2$MI = factor(rst2$MI,levels(rst2$MI)[c(2,4,3,1)])
-rst5 = rst2
+rst5 <- rst[(rst$CI.method %in% Wald) & (rst$MI %in% MIset),]
+rst5$MI <- as.factor(rst5$MI)
+rst5$MI = factor(rst5$MI,levels(rst5$MI)[c(2,4,3,1)])
+
 # reshaping: wide to long
 rst5 <- reshape(rst5, varying=c("v.0.8","v.0.9","v.0.95","v.0.99"), direction="long", idvar=c("phi","rho","n","MI","CI.method", "measure"), sep=".0")
 rownames(rst5) <- NULL

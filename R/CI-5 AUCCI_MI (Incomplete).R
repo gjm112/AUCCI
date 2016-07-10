@@ -52,6 +52,11 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
       x = temp$x ; y = temp$y
       mi.stat$theta[i] = AUC(x, y,...)
       n.x.vec[i] = length(x)
+      
+      if ("NS1" %in% CI.method | "NS2" %in% CI.method ) {
+        mi.stat$pXY[i] = p.XY(x,y)
+      }
+      
       if ("Mee" %in% CI.method) {
         mi.stat$N.J.hat[i] = Mee.stat(x, y)$N.J.hat
       }
@@ -65,6 +70,7 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
     mean.MI = mean(mi.stat$theta, na.rm=TRUE)
     mean.MI.LT = mean(mi.stat$theta.LT, na.rm=TRUE)
     var.B.LT = var(mi.stat$theta.LT, na.rm=TRUE)    # => Erase when not necessary any more after using funtion Rubin
+    mean.pXY = mean(mi.stat$pXY, na.rm=TRUE)
     
   }
   
@@ -102,7 +108,7 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
       start = c( (mean.MI+.5)/2, (mean.MI+1)/2)
       start = mean.MI + c(-1,+1)*qnorm(1-alpha/2)*sqrt(mean.MI*(1-mean.MI)/n.x/n.y)
       if (score.MI == "fixed.r" & LT==FALSE) {  #if n.x==1, var is not estimable, make it population var to estimate r.
-        W = V.HM(AUC=mean.MI, n.x=n.x, n.y=n.y, LT=LT, NC=FALSE, sample.var=ifelse(n.x==1,FALSE,TRUE))
+        W = V.HM(AUC=mean.MI, n.x=n.x, n.y=n.y, LT=LT, pXY=mean.pXY, NC=FALSE, sample.var=ifelse(n.x==1,FALSE,TRUE))
         r = Rubin(W=W, MI=mi.stat$theta.LT, alpha=alpha, print.r=TRUE)$r
         mi.theta.fin = mi.stat$theta.LT[is.finite(mi.stat$theta.LT)]
         if (length(mi.theta.fin)==0) {
@@ -110,9 +116,9 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
         } else {
         if (all(mi.theta.fin==1)) {r=1}  #if all theta_(i)'s are 1, W=0, r=undefined, V=0
         if (CI.method == "NS1") {
-          CI = polyroot2(HM.coef,AUC.hat=mean.MI, n.x=n.x, n.y=n.y, NC=FALSE, alpha=alpha, r=r)
+          CI = polyroot2(HM.coef,AUC.hat=mean.MI, n.x=n.x, n.y=n.y, pXY=mean.pXY, NC=FALSE, alpha=alpha, r=r)
         } else if (CI.method == "NS2") {
-          CI = polyroot2(HM.coef,AUC.hat=mean.MI, n.x=n.x, n.y=n.y, NC=TRUE, alpha=alpha, r=r)
+          CI = polyroot2(HM.coef,AUC.hat=mean.MI, n.x=n.x, n.y=n.y, pXY=mean.pXY, NC=TRUE, alpha=alpha, r=r)
         } else if (CI.method == "Mee") {
           CI = polyroot2(Mee.coef,AUC.hat=mean.MI, N.J.hat=mean(mi.stat$N.J.hat, na.rm=TRUE), alpha=alpha, r=r)
         }
@@ -120,9 +126,9 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
       }
       else {
         if (CI.method == "NS1") {
-          CI = multiroot2(HMS.equation, start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root    
+          CI = multiroot2(HMS.equation, start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, pXY=mean.pXY, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root    
         } else if (CI.method == "NS2") {
-          CI = multiroot2(HMS.equation,  start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, NC=TRUE, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root 
+          CI = multiroot2(HMS.equation,  start, AUC.hat=mean.MI, n.x=n.x, n.y=n.y, pXY=mean.pXY, alpha=alpha, MI=mi.stat$theta.LT, LT=LT, NC=TRUE, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root 
         } else if (CI.method == "Mee") {
           CI = multiroot2(Mee.equation,  start, AUC.hat=mean.MI, N.J.hat = mean(mi.stat$N.J.hat, na.rm=TRUE), alpha=alpha, MI=mi.stat$theta.LT, LT=LT, score.MI=score.MI, sample.var=FALSE, rtol = 1e-10, atol = 1e-10, ...)$root
         }

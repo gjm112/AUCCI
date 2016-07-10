@@ -93,26 +93,32 @@ expit <- function(data, LT=TRUE) {
 # (added the half of the tie cases in June 2016)
 Q.stat <- function(x, y, n.x=length(x), n.y=length(y)) {
   Q2 <- Q1 <- 0
-  for (i in 1:n.x) {Q1 = Q1 + ( sum(y > x[i]) + sum(y == x[i])/2 )^2}; Q1 = Q1 /(n.x * n.y^2)  # no ties
+  for (i in 1:n.x) {Q1 = Q1 + ( sum(y > x[i]) + sum(y == x[i])/2 )^2}; Q1 = Q1 /(n.x * n.y^2)
   for (j in 1:n.y) {Q2 = Q2 + ( sum(y[j] > x) + sum(y[j] == x)/2 )^2}; Q2 = Q2 /(n.x^2 * n.y)
   return(data.frame(Q1 = Q1, Q2 = Q2))
 }
-V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1), LT=FALSE, NC=FALSE, sample.var=TRUE, ...) {
+# p(Y=X)
+p.XY <- function(x, y, n.x=length(x), n.y=length(y)) {
+  pXY <- 0
+  for (i in 1:n.x) {pXY = pXY + sum(y == x[i])}; pXY = pXY /(n.x * n.y)
+  return(pXY)
+}
+V.HM <- function(AUC, n.x, n.y, Q1 = AUC/(2-AUC), Q2=2* AUC^2 /(AUC + 1), pXY, LT=FALSE, NC=FALSE, sample.var=TRUE, ...) {
   # default: HME method
   N = (n.x+n.y)/2
   if (LT) {div.LT = (AUC*(1-AUC))^2} else {div.LT=1}
   nxny = ifelse(sample.var, (n.x-1)*(n.y-1), n.x*n.y)  # sample.var: dividing by (nx-1)(ny-1) is unbiased
-  if (NC==FALSE) {V = (AUC * (1-AUC) + (n.y -1)*(Q1 - AUC^2) + (n.x-1)*(Q2 - AUC^2)) /nxny /div.LT}
+  if (NC==FALSE) {V = (AUC * (1-AUC) - pXY/4 + (n.y -1)*(Q1 - AUC^2) + (n.x-1)*(Q2 - AUC^2)) /nxny /div.LT}
   else {V = AUC*(1-AUC)/nxny * ( (2*N-1) - (3*N-3) / ((2-AUC)*(AUC+1)) )/div.LT}
   return(V)
 }
 
 ### for score method it should be populatoin variance not sample variance (sample.var=FALSE).
-HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, NC=FALSE, sample.var=FALSE, score.MI = "fixed.r") {
-  W = V.HM(AUC, n.x, n.y, LT=LT, NC=NC, sample.var=sample.var)
+HMS.equation = function(AUC, AUC.hat, n.x, n.y, pXY, alpha, MI=NA, LT=FALSE, NC=FALSE, sample.var=FALSE, score.MI = "fixed.r") {
+  W = V.HM(AUC, n.x, n.y, pXY=pXY, LT=LT, NC=NC, sample.var=sample.var)
   if (score.MI == "fixed.r") {
     ## 1. fixed r
-    W.hat = V.HM(AUC.hat, n.x, n.y, LT=LT, NC=NC, sample.var=sample.var)
+    W.hat = V.HM(AUC.hat, n.x, n.y, pXY=pXY, LT=LT, NC=NC, sample.var=sample.var)
     Rubin = Rubin(W=W.hat, MI=MI, alpha=alpha, print.r=TRUE)
     z.val = Rubin$z.val       # nu is fixed (since r is fixed)
     r = Rubin$r
@@ -125,15 +131,16 @@ HMS.equation = function(AUC, AUC.hat, n.x, n.y, alpha, MI=NA, LT=FALSE, NC=FALSE
     return((logit(AUC,LT=LT) - min(10,logit(AUC.hat,LT=LT)))^2 - z.val^2*V)
   }
 }
-HM.coef = function(AUC.hat, n.x, n.y, NC=FALSE, alpha, r=0){   #coefficients of expanded equation to be solved by to polyroot
+
+HM.coef = function(AUC.hat, n.x, n.y, pXY, NC=FALSE, alpha, r=0){   #coefficients of expanded equation to be solved by polyroot
   if (NC==FALSE) {n.x0 = n.x; n.y0 = n.y}
   else {n.x0 <- n.y0 <- (n.x+n.y)/2}
   z = qnorm(1-alpha/2)
   t4 = (n.x0 + n.y0 -1)*(1+r)*z^2 + 1*n.x*n.y
   t3 = (-3*n.x0 -n.y0 +2)*(1+r)*z^2 +(-2 *AUC.hat -1)*n.x*n.y
-  t2 = (2*n.x0 -n.y0 -2)*(1+r)*z^2 + (AUC.hat^2 + 2*AUC.hat -2)*n.x*n.y
-  t1 = (n.y0 +1)*(1+r)*z^2 +(-AUC.hat^2 + 4*AUC.hat)*n.x*n.y
-  t0 = -2*AUC.hat^2*n.x*n.y
+  t2 = (2*n.x0 -n.y0 -2 + pXY/4)*(1+r)*z^2 + (AUC.hat^2 + 2*AUC.hat -2)*n.x*n.y
+  t1 = (n.y0 +1 - pXY/4)*(1+r)*z^2 +(-AUC.hat^2 + 4*AUC.hat)*n.x*n.y
+  t0 = (-pXY/2)*(1+r)*z^2 -2*AUC.hat^2*n.x*n.y
   return(c(t0, t1, t2, t3, t4))
 }
 
