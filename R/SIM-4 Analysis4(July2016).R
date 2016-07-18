@@ -31,7 +31,7 @@ for (i in d1) {         #i: theta*phi
   th = round(param1$alphabet$theta[i],4); ph = param1$alphabet$phi[i]
   for (j in d2) {       #j: rho
     rh = param1$gamma$rho[j]
-    tmp <- readRDS(paste0("R/Simdata2/sim_data-Jul01-",i,j,".rds"))
+    tmp <- readRDS(paste0("R/Simdata3/sim_data-Jul12-",i,j,".rds"))
     # CI lengths to be restricted within [0,1]
     for (h in d3){
       # truncation
@@ -89,11 +89,21 @@ levels(pointest$MI) <- c("complete", "PMM", "LR", "NORM", "NORM(simple)", "NORM(
 pointest$AUC.hat <- as.numeric(pointest$AUC.hat)
 head(pointest)
 pointest.avg <- aggregate(AUC.hat ~ AUC + MI, mean, data=pointest)
-ggplot(pointest.avg[pointest.avg$MI %in% c("complete", "PMM", "LR", "NORM"),], aes(MI, AUC.hat)) + geom_point(aes(colour = factor(MI)), size = 4) + facet_grid(. ~ AUC, labeller=label_both) + 
-  geom_abline(intercept = 0.8, slope=0) + geom_abline(intercept = 0.9, slope=0) + 
-  geom_abline(intercept = 0.95, slope=0) + geom_abline(intercept = 0.99, slope=0) + 
-  theme(axis.text.x = element_blank(),axis.ticks = element_blank()) +
+
+AUC.data <- data.frame(AUC.hat=c(.8,.9,.95,.99), AUC=c(.8,.9,.95,.99))
+ggplot(pointest.avg[pointest.avg$MI %in% c("complete", "PMM", "LR", "NORM"),], aes(MI, AUC.hat)) + 
+  facet_grid(. ~ AUC, labeller=label_both) +
+  geom_point(aes(colour = factor(MI), shape=factor(MI)), size = 3) + 
+  geom_segment(aes(x=0, xend=5, y=AUC.hat, yend=AUC.hat, label=NULL), size=1,  
+               data=AUC.data) +
+  # geom_abline(intercept = AUC.data$AUC.hat, slope=0,  data=AUC.data) +
+  # geom_abline(intercept = 0.8, slope=0) + geom_abline(intercept = 0.9, slope=0) + 
+  # geom_abline(intercept = 0.95, slope=0) + geom_abline(intercept = 0.99, slope=0) + 
+  theme(axis.text.x = element_blank(),axis.ticks = element_blank(),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(colour = "grey80")) +
   ylab("Average AUC estimate")
+ggsave("R/bias_plot.png", width = 200, height = 100, units = "mm")
 
 ## reshaping: wide to long
 rst = melt(result, id =c("theta","phi","rho","n","MI","measure"))
@@ -237,10 +247,11 @@ rst5.phrh <- aggregate(value~phi+rho+theta+MI+CI.method+measure, FUN=mean,data=r
 rst5.n <- aggregate(value~n+theta+MI+CI.method+measure, FUN=mean,data=rst5) # across phi and rho
 
 p.CP <- ggplot(rst5.phrh[rst5.phrh$measure == "CP",], aes(theta, value, group = CI.method)) + 
-  geom_line(aes(color=CI.method)) +
+  geom_line(aes(color=CI.method, linetype=CI.method)) +
   geom_abline(intercept = .95, slope = 0) +
   geom_point(aes(shape=CI.method, color=CI.method)) + 
-  facet_grid(phi+rho ~ MI, labeller=label_both, scales="free_y", space="free_y") +
+  #facet_grid(phi+rho ~ MI, labeller=label_both, scales="free_y", space="free_y") +
+  facet_grid(phi+rho ~ MI, labeller=label_both) +
   # ylim(0.7,1) +
   xlab("AUC") +
   ylab("CP") +
@@ -250,10 +261,11 @@ p.CP <- ggplot(rst5.phrh[rst5.phrh$measure == "CP",], aes(theta, value, group = 
   theme(legend.position="bottom")
   # geom_text(aes(theta, CP, label=paste("phi & rho", labs), group=NULL), size = 4, color = "grey50", data=dat, parse = T)
 p.CP
+ggsave("R/CPplot1_phirho.png", width = 200, height = 100, units = "mm")
 
 
 p.CIL <- ggplot(rst5.phrh[rst5.phrh$measure == "CIL",], aes(theta, value, group = CI.method)) + 
-  geom_line(aes(color=CI.method)) +
+  geom_line(aes(color=CI.method, linetype=CI.method)) +
   # geom_abline(intercept = .95, slope = 0) +
   geom_point(aes(shape=CI.method, color=CI.method)) + 
   # facet_grid(phi+rho ~ MI, labeller=label_both, scales="free_y", space="free_y") +
@@ -265,13 +277,16 @@ p.CIL <- ggplot(rst5.phrh[rst5.phrh$measure == "CIL",], aes(theta, value, group 
   theme_bw()  +
   theme(legend.position="bottom")
 p.CIL
+ggsave("R/CILplot1_phirho.png", width = 200, height = 100, units = "mm")
+
 
 
 p.CP.n <- ggplot(rst5.n[rst5.n$measure == "CP",], aes(theta, value, group = CI.method)) + 
-  geom_line(aes(color=CI.method)) +
+  geom_line(aes(color=CI.method, linetype=CI.method)) +
   geom_abline(intercept = .95, slope = 0) +
   geom_point(aes(shape=CI.method, color=CI.method)) + 
-  facet_grid(n ~ MI, labeller=label_both, scales="free_y", space="free_y") +
+  # facet_grid(n ~ MI, labeller=label_both, scales="free_y", space="free_y") +
+  facet_grid(n ~ MI, labeller=label_both) +
   # ylim(0.7,1) +
   xlab("AUC") +
   ylab("CP") +
@@ -281,10 +296,12 @@ p.CP.n <- ggplot(rst5.n[rst5.n$measure == "CP",], aes(theta, value, group = CI.m
   theme(legend.position="bottom")
 # geom_text(aes(theta, CP, label=paste("phi & rho", labs), group=NULL), size = 4, color = "grey50", data=dat, parse = T)
 p.CP.n
+ggsave("R/CPplot2_n.png", width = 200, height = 100, units = "mm")
+
 
 
 p.CIL.n <- ggplot(rst5.n[rst5.n$measure == "CIL",], aes(theta, value, group = CI.method)) + 
-  geom_line(aes(color=CI.method)) +
+  geom_line(aes(color=CI.method, linetype=CI.method)) +
   # geom_abline(intercept = .95, slope = 0) +
   geom_point(aes(shape=CI.method, color=CI.method)) + 
   # facet_grid(n ~ MI, labeller=label_both, scales="free_y", space="free_y") +
@@ -296,3 +313,5 @@ p.CIL.n <- ggplot(rst5.n[rst5.n$measure == "CIL",], aes(theta, value, group = CI
   theme_bw()  +
   theme(legend.position="bottom")
 p.CIL.n
+ggsave("R/CILplot2_n.png", width = 200, height = 100, units = "mm")
+

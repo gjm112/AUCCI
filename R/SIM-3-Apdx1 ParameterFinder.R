@@ -54,7 +54,7 @@ param.finder = function(param = "beta1", start, target, digit = 1, target.digit=
         setTxtProgressBar(pb,j)
         temp <- data.frame(disease=rep(NA,n), marker=NA)
         for (i in 1:n2) {temp[((i-1)*n1+1):(i*n1),] <- datagenerator(n=n1, alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, dist=dist, option="VDT")} ; Sys.time()-a
-        tht[j] <- AUC(data=temp, disease="disease", marker="marker", discrete=FALSE); Sys.time()-a
+        tht[j] <- AUC.2(data=temp, disease="disease", marker="marker", discrete=FALSE); Sys.time()-a
       }
       print(tht.mean <- mean(tht)); print(range(tht)); print(tht)
       err0 = err                # old value

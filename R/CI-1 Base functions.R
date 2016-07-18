@@ -30,7 +30,7 @@ CI.base <- function(mu.hat, Var, alpha, dist=qnorm,...) {
   return(mu.hat + c(-1,1) * dist(1-alpha/2,...)*sqrt(Var))
 }
 # recommended when the biomarker is discrete. (modified June 2016)
-AUC.classic <- function(x, y, n.x=length(x), n.y=length(y), data=NA, disease="disease", marker="marker") {
+AUC <- function(x, y, n.x=length(x), n.y=length(y), data=NA, disease="disease", marker="marker") {
   if (!is.na(data[1])[1]) {
     xy = data2xy(data, disease=disease, marker=marker)
     x = xy$x
@@ -43,9 +43,9 @@ AUC.classic <- function(x, y, n.x=length(x), n.y=length(y), data=NA, disease="di
 
 # new AUC function added with much improved efficiency (but not precise when the biomarker is discrete.)
 # When discrete, use AUC.classic. discrete is TRUE by default. use FALSE when simulating/finding parameters.
-AUC <- function(x, y, n.x=length(x), n.y=length(y), data=NA, disease="disease", marker="marker", discrete=TRUE) {
+AUC.2 <- function(x, y, n.x=length(x), n.y=length(y), data=NA, disease="disease", marker="marker", discrete=TRUE) {
   if (discrete) {
-    result = AUC.classic(x=x, y=y, n.x=n.x, n.y=n.y, data=data, disease=disease, marker=marker)
+    result = AUC(x=x, y=y, n.x=n.x, n.y=n.y, data=data, disease=disease, marker=marker)
     return(result)
   } else {
     if (!is.na(data[1])[1]) {

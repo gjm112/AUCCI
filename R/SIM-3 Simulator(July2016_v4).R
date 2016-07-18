@@ -202,9 +202,8 @@ count <- 1   # for time checking in dopar
 
 pb <- txtProgressBar(min=0, max = length(d1)*length(d2), style=3)
 for (i in d1) {
-  
+#  if (i > 6) {    # break and resume by controlling numbers
   for (j in d2) {
-  if (i+j >= 5) {    # break and resume by controlling numbers
     if (parallel) {cl <- makeSOCKcluster(4)}      # for parallel
     if (parallel) {registerDoSNOW(cl)}            # for parallel
     print(c(i,j, paste0("out of ", length(d1),"x", length(d2))))
@@ -230,16 +229,16 @@ for (i in d1) {
     }
 
     if (parallel) {stopCluster(cl)}               # for parallel
-    saveRDS(temp.d3, paste0("R/Simdata2/sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
+    saveRDS(temp.d3, paste0("R/Simdata3/sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
     # Time stat
     elapsed = Sys.time()-bgn
     expected = bgn + elapsed/((i-1)*2+j)*12
     print(paste0("bgn: ", format(bgn,"%m/%d %H:%M"), ", elapsed: ", round(elapsed,1), " min's, expected: ", format(expected,"%m/%d %H:%M"), ", i: ", paste(i,"in", length(d1)), ", j: ", paste(j,"in", length(d2)) ))
     
     temp.d2[[j]] <- temp.d3
-  }
   } # j in d2
   temp.d1[[i]] <- temp.d2
+# } # break and resume
 } # i in d1
 # sim.data = temp.d1; rm(temp.d1,temp.d2)
 

@@ -33,12 +33,16 @@ ADdata1$BPSYS[ADdata1$BPSYS %in% c(888,-4)] <- NA
 ADdata1$HRATE[ADdata1$HRATE %in% c(888,-4)] <- NA
 ADdata1$PDNORMAL[ADdata1$PDNORMAL %in% c(8,-4)] <- NA
 ADdata1$PDNORMAL <- as.factor(ADdata1$PDNORMAL)
+ADdata1$SMOKYRS[ADdata1$SMOKYRS %in% c(88,99,-4)] <- NA
+ADdata1$NACCNIHR[ADdata1$NACCNIHR %in% c(88,99,-4)] <- NA
+ADdata1$NACCNIHR <- as.factor(ADdata1$NACCNIHR)
 ADdata1$NACCGDS[ADdata1$NACCGDS %in% c(88,-4)] <- NA
 ADdata1$NACCMMSE[ADdata1$NACCMMSE %in% c(31:100,-4)] <- NA
 
 # NACCETPR: disease status
 ADdata1$NACCETPR[ADdata1$NACCETPR %in% c(80:100)] <- NA # missing
 ADdata1$NACCETPR[ADdata1$NACCETPR %in% c(2:30)] <- 0    # symptoms other than AD
+ADdata1$NACCETPR <- as.factor(ADdata1$NACCETPR)
 #rho (missing ratio) 48.2% missing
 mean(is.na(ADdata1$NACCETPR))
 
@@ -109,8 +113,8 @@ MIseed = 100
   apply(ADdata3.pmm.CI,1,mean)[1]   #AUC.hat
   ADdata3.pmm.CI
   
-
-### ADdata4: with complete variables only. CDRGLOB as the biomarker. randomly chosen 200 obs only
+if (FALSE) {
+  ### ADdata4: with complete variables only. CDRGLOB as the biomarker. randomly chosen 200 obs only
   ADdata4 <- ADdata1[smp, c("NACCID","NACCETPR","CDRGLOB","SEX","NACCNIHR","SMOKYRS","NACCAGE")]
   names(ADdata4)[2] <- "diseaseR"
   names(ADdata4)[3] <- "marker"
@@ -123,8 +127,8 @@ MIseed = 100
   ADdata4.pmm.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata4.pmm, CI.method=x)$CI)))
   apply(ADdata4.pmm.CI,1,mean)[1]   #AUC.hat
   ADdata4.pmm.CI
-
-### ADdata5: with all variables. CDRGLOB as the biomarker (and excluding CDRSUM). randomly chosen 200 obs only
+  
+  ### ADdata5: with all variables. CDRGLOB as the biomarker (and excluding CDRSUM). randomly chosen 200 obs only
   ADdata5 <- ADdata1[smp, c("NACCID","NACCETPR","CDRGLOB","SEX","NACCNIHR","SMOKYRS","NACCAGE","NACCMMSE","EDUC","NACCFAM","BPSYS","HRATE","NACCGDS","NACCAMD","NACCBMI", "PDNORMAL")]
   names(ADdata5)[2] <- "diseaseR"
   names(ADdata5)[3] <- "marker"
@@ -137,6 +141,7 @@ MIseed = 100
   ADdata5.pmm.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata5.pmm, CI.method=x)$CI)))
   apply(ADdata5.pmm.CI,1,mean)[1]   #AUC.hat
   ADdata5.pmm.CI
+}
 
 
 ### naive estimator (= 0.6435 and 0.6122)
@@ -149,7 +154,8 @@ AUC(data=ADdata5, disease="diseaseR") #CDRGLOB as biomarker
 ### pmm, lr, norm
 predM = 1 - diag(1, ncol(ADdata3)); predM[,1] <- 0 # ignoring the ID when predicting
 set.seed(MIseed)
-tmp <- mice(ADdata3, m=10, method="logreg", printFlag=F, predictorMatrix=predM)
+method.tmp = rep("pmm",16); method.tmp[c(2,4,10,16)] <- "logreg"
+tmp <- mice(ADdata3, m=10, method=method.tmp, printFlag=F, predictorMatrix=predM)
 
 set.seed(MIseed)
 ADdata3.lr <- lapply(1:10, function(x) complete(tmp, action=x))
@@ -158,6 +164,7 @@ apply(ADdata3.lr.CI,1,mean)[1]   #AUC.hat
 ADdata3.lr.CI
 
 set.seed(MIseed)
+ADdata3$diseaseR <- as.numeric(ADdata3$diseaseR)
 ADdata3.NORM <- MI.norm(ADdata3[,-1], m=10, rounding="adaptive", showits=F)
 ADdata3.NORM.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata3.NORM, CI.method=x)$CI)))
 apply(ADdata3.NORM.CI,1,mean)[1]   #AUC.hat
@@ -192,12 +199,25 @@ vline.data$AUC.hat[3] <- mean(sapply(1:10, function(x) AUC(data=ADdata3.NORM[[x]
 
 AUC.naive <- AUC(data=ADdata3, disease="diseaseR")
 
-p <- ggplot(xlim=c(0.5,1.1)) 
-p +facet_grid(MI ~ .) + geom_segment(aes(x=lb, xend=ub, y=no, yend=no, color=CI.method, label=CI.method), data=ADdata3.CI) +
-  geom_vline(aes(xintercept = AUC.hat),  color = "black", vline.data, show_guide = TRUE) + 
-  #geom_vline(xintercept = AUC.complete,  color = "gray") +
+p <- ggplot(xlim=c(0.4,1.0))
+p + facet_grid(MI ~ .) + 
+  geom_segment(aes(x=lb, xend=ub, y=no, yend=no, color="grey", label=NULL), size=1.5,  
+                data=ADdata3.CI) +
+  geom_point(aes(AUC.hat, 1), color = "black", size = 2, data=vline.data) +
+  geom_point(aes(AUC.hat, 2), color = "black", size = 2, data=vline.data) +
+  geom_point(aes(AUC.hat, 3), color = "black", size = 2, data=vline.data) +
+  geom_point(aes(AUC.hat, 4), color = "black", size = 2, data=vline.data) +
+  geom_point(aes(AUC.hat, 5), color = "black", size = 2, data=vline.data) +
+  #geom_vline(aes(xintercept = AUC.hat), color = "black", vline.data) + 
   geom_vline(xintercept = AUC.naive, linetype="dotted", color = "blue", size=1) +
   labs(x = "confidence intervals", y = "CI methods by MI techniques") +
-  theme(axis.text.y = element_blank(), axis.ticks.y =  element_blank())
+  theme(axis.text.y = element_blank(), axis.ticks.y =  element_blank(),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(colour = "grey80"),
+        legend.position="none")+
+  #scale_color_discrete(name="CI methods") +
+  geom_text(data=ADdata3.CI, x=0.45, y=ADdata3.CI$no, aes(label=CI.method), show.legend = FALSE) +
+  xlim(c(0.4,1.0))
+
 
 ggsave("R/AD_plot.png", width = 200, height = 100, units = "mm")
