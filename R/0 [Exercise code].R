@@ -17,7 +17,10 @@
   q4 = q2
   gamma = 0.7
 }
-temp <- datagenerator(100,alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=2, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, option="VDTR")
+temp <- datagenerator(100,alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, option="VDTR")
+#naive; complete
+AUCCI(data=temp,CI.method="HM1", disease="diseaseR")$AUC.hat; AUCCI(data=temp,CI.method="HM1")$AUC.hat
+
 
 
 ### 1-1 AUC, data2xy #####################################################
@@ -61,7 +64,7 @@ MI.method = "pmm"
 alpha = .05
 
 # Example
-AUCCI.MI(temp, MI.function=mice, MI.method="pmm", alpha=.05, CI.method="HM1", m = m, score.MI="fixed.r")
+AUCCI.MI(temp, MI.function=mice2, MI.method="pmm", alpha=.05, CI.method="HM1", m = m, score.MI="fixed.r")
 CI.i(temp, fun=AUCCI.MI, CI.method=CI.methods, type="landscape2",MI.function=mice, MI.method="pmm", alpha=.05, m = m)
 
 # test

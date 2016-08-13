@@ -40,9 +40,13 @@ param1 = list(alphabet = data.frame(phi = rep(c(.5,.7), each=4),
 n = c(200, 100, 50)
 alpha = 0.05
 # CI.methods from 1-1 [CI] Base functions.R
-CI.methods = c("Bm", "HM1", "HM2", "NS1", "NW", "NS2", "Mee", "DL", "RG", "DB", "DG", "CM")
-# MI.methods from 1-5 [CI] AUCCI_MI
-MI.methods = data.frame(functions=c(rep("mice2",2),rep("MI.norm",3)), methods=c("pmm","logreg","simple","coinflip","adaptive"))
+# CI.methods = c("Bm", "HM1", "HM2", "NS1", "NW", "NS2", "Mee", "DL", "RG", "DB", "DG", "CM")
+CI.methods = c("Bm", "HM1", "HM2", "NW", "DL")
+# MI.methods from 1-5 [CI] AUCCI_MI  //MI.norm2(da.norm) instead of MI.norm(imp.norm)
+MI.methods = data.frame(functions=c(rep("mice2",2),rep("MI.norm2",3)), methods=c("pmm","logreg","simple","coinflip","adaptive"))
+# (run on July 26) MI.methods = data.frame(functions=c(rep("MI.norm2",3)), methods=c("simple","coinflip","adaptive"))
+
+
 m = 10
 # Direct methods with bootstrap. R = # of resamples
 Dir.methods = c("naive", "BG", "MS", "SP", "IPW", "He")
@@ -90,8 +94,8 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
   
   ### 2. Empty shells that is outer than k (1:n.sim) 
   # for A-Est: Complete data
-  temp.est <- as.data.frame(matrix(NA,n.sim,(length(CI.methods)*2+1)))
-  names(temp.est) <- c("AUC.hat",paste0(rep(CI.methods,each=2),c(".lb",".ub")))
+  temp.est.na <- temp.est.com <- as.data.frame(matrix(NA,n.sim,(length(CI.methods)*2+1)))
+  names(temp.est.com) <- names(temp.est.na) <- c("AUC.hat",paste0(rep(CI.methods,each=2),c(".lb",".ub")))
   
   # for B-Est: Imputations
   temp.estMI <- lapply(MI.method, function(l) {a <- as.data.frame(matrix(NA,n.sim,(length(CI.methods)*2+1))) 
@@ -114,14 +118,17 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
     # A-Gen. Data generation(from 2.)
     temp <- datagenerator(n=n[h], alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, option="VDTR")
     # A-Est: Inferences (complete datasets)
-    temp.est[k,] <- CI.i(temp,fun=AUCCI, CI.method=CI.method, alpha=alpha, type="landscape2")
+    temp.est.com[k,] <- CI.i(temp, fun=AUCCI, CI.method=CI.method, alpha=alpha, type="landscape2")
+    # A-Est2 (naive estimator)
+    temp.est.na[k,] <- CI.i(temp, fun=AUCCI, CI.method=CI.method, disease="diseaseR", alpha=alpha, type="landscape2")      
+    
     
     ####### counter ######
     count <<- count + 1
     #pb.text <- paste0("Data+",ifelse(imputation,"MI+",""),ifelse(Dir,"Dir+",""),"Est|")
     #pb <- txtProgressBar(min=0, max = n.sim, char = paste0(((i-1)*2+j-1)*3+h, "/",d123, pb.text), style=3)
     #setTxtProgressBar(pb,count)
-    if (k %% 300 == 0) {write.csv(NA, paste0("progress/progress(",paste0(c(i,j,h,k),collapse="-"),")",format(Sys.time(), "%b%d-%H%M%S"),".csv"))}
+    if (k %% 250 == 0) {write.csv(NA, paste0("progress/progress(",paste0(c(i,j,h,k),collapse="-"),")",format(Sys.time(), "%b%d-%H%M%S"),".csv"))}
     if (count %% 1000 == 0) {
       progress = count / (d123*n.sim)
       elapsed = Sys.time() - bgn
@@ -144,7 +151,7 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
           if (is.na(temp.MI[[l]][[1]][[1]][[1]])) { nonimputable[[l]] = TRUE}
         }
         else if (l == "simple"|l == "coinflip"|l == "adaptive") {
-          temp.MI[[l]] <- MI.norm(data=temp[,-1], rounding=l, m=m, showits=FALSE)
+          temp.MI[[l]] <- MI.norm2(data=temp[,-1], rounding=l, m=m, showits=FALSE)
         }
         else {stop("Wrong MI method!")}
       }
@@ -158,6 +165,7 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
           temp.estMI[[l]][k,] <- CI.i(temp.MI[[l]], fun=AUCCI.MI, CI.method=CI.method, m=m, alpha=alpha, type="landscape2")
         }
       }
+      
     } #imputation==TRUE
     debug.l <<- c(l,NA)
     
@@ -170,7 +178,7 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
   }
   
   # storing A ~ C-2
-  temp.d4 <- list(parm = data.frame(theta=theta, phi=phi, gamma=gamma, rho=rho, n=n[h]), est.com = temp.est)
+  temp.d4 <- list(parm = data.frame(theta=theta, phi=phi, gamma=gamma, rho=rho, n=n[h]), est.com = temp.est.com, est.na = temp.est.na)
   if (imputation==TRUE) {
     temp.d4[["est.MI"]] = temp.estMI
   }
@@ -179,18 +187,20 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
     temp.d4[["est.Dir.Wald"]] = temp.estDir.Wald
   }
   
-  # D-1. Evaluation of C-1(est.com)
+  # D-1. Evaluation of A-1(est.com)
   temp.eval <- list()
-  temp.eval[["1. complete"]] <- CI.evaluator(temp.d4[["est.com"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+  temp.eval[["1.1 complete"]] <- CI.evaluator(temp.d4[["est.com"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
+  temp.eval[["1.2 naive"]] <- CI.evaluator(temp.d4[["est.na"]], param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4)
   names(temp.eval)[1] <- paste0("theta=",round(theta,2),", phi=",phi,", rho=",rho,", n=",n[h],", 1.complete")
+  names(temp.eval)[2] <- paste0("theta=",round(theta,2),", phi=",phi,", rho=",rho,", n=",n[h],", 2.naive")
   if (imputation==TRUE) {
     temp.eval <- c(temp.eval, lapply(temp.d4[["est.MI"]], function(x) CI.evaluator(x, param = temp.d4[["parm"]], CI.method = CI.methods, na.rm = na.rm, round=4) ))
-    names(temp.eval)[2:6] <- paste0("theta=",round(theta,2),", phi=",phi,", rho=",rho,", n=",n[h],c(", 2.pmm", ", 3.logreg", ", 4.simple", ", 5.coinflip", ", 6.adaptive"))
+    names(temp.eval)[3:7] <- paste0("theta=",round(theta,2),", phi=",phi,", rho=",rho,", n=",n[h],c(", 2.pmm", ", 3.logreg", ", 4.simple", ", 5.coinflip", ", 6.adaptive"))
   } #imputation==TRUE
   if (Dir==TRUE) {
     temp.eval[["7. Bootstrap-BCA"]] <- CI.evaluator(temp.d4[["est.Dir.BCA"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
     temp.eval[["8. Bootstrap-Wald"]] <- CI.evaluator(temp.d4[["est.Dir.Wald"]], param = temp.d4[["parm"]], CI.method = Dir.methods, na.rm = na.rm, round=4)
-    names(temp.eval)[if(imputation) {c(7,8)} else{c(2,3)}] <- paste0("theta=",round(theta,2),", phi=",phi,", rho=",rho,", n=",n[h],c(", 7. Bootstrap-BCA", ", 8. Bootstrap-Wald"))
+    names(temp.eval)[if(imputation) {c(8,9)} else{c(3,4)}] <- paste0("theta=",round(theta,2),", phi=",phi,", rho=",rho,", n=",n[h],c(", 7. Bootstrap-BCA", ", 8. Bootstrap-Wald"))
   } #Dir==TRUE
   temp.d4$eval <- temp.eval
   return(temp.d4)
@@ -229,7 +239,7 @@ for (i in d1) {
     }
 
     if (parallel) {stopCluster(cl)}               # for parallel
-    saveRDS(temp.d3, paste0("R/Simdata3/sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
+    saveRDS(temp.d3, paste0("R/Simdata5/sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
     # Time stat
     elapsed = Sys.time()-bgn
     expected = bgn + elapsed/((i-1)*2+j)*12

@@ -16,7 +16,12 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
   # basic stats
   x = data[data[,disease]==0, marker]
   y = data[data[,disease]==1, marker]
+  x = x[!is.na(x)]
+  y = y[!is.na(y)]
   n.x = length(x) ; n.y = length(y) ; n = n.x + n.y
+  if (n.x == 0) {warning("there is no x(nondiseased)")}
+  else if (n.y == 0) {warning("there is no y(diseased)")}
+  
   A = AUC(x, y, n.x, n.y, ...)
   A.LT = logit(A, LT=LT)
   start = c( A/2, (A+1)/2)

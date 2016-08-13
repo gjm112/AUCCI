@@ -14,7 +14,7 @@ MI.methods = data.frame(functions=c(rep("mice2",2),rep("MI.norm",3)), methods=c(
 ## 1.5.1 AUCCI.MI ##################################################################### 
 # For score types DO NOT use LT!!! very unstable for theta near 1
 
-AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.method, alpha=.05, LT=FALSE, variance=FALSE, MI.thetas=FALSE, ...) {
+AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, maxit=5, CI.method, alpha=.05, LT=FALSE, variance=FALSE, MI.thetas=FALSE, ...) {
   # note: predictorMatrix(for mice) should exclude disease
   # LT: logit transformation      # not available for RG
   # returning variance when logit=T is var(logit(theta))
@@ -33,10 +33,10 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
     # For convenience of one-time CI construction. Very unefficient for large size of simulation
     else if (class(data) == "data.frame") {
       if (identical(MI.function, mice2)) {
-        data.comp <- MI.function(data=data[,-1], method=MI.method, m=m, printFlag=FALSE,...)
-      } else if (identical(MI.function, MI.norm)) {
-        data.comp <- MI.function(data=data[,-1], rounding=MI.method, m=m, showits=FALSE,...)
-      }
+        data.comp <- MI.function(data=data[,-1], method=MI.method, m=m, maxit=maxit, printFlag=FALSE,...)
+      } else if (identical(MI.function, MI.norm)|identical(MI.function, MI.norm2)) { #MI.norm2 added (da.norm) vs MI.norm(imp.norm)
+        data.comp <- MI.function(data=data[,-1], rounding=MI.method, m=m, maxit=maxit, showits=FALSE,...)
+      } else {stop("the MI.function is neither mice2 nor MI.norm nor MI.norm2")}
     }
     
     # 3. Otherwise, stop running the code.
@@ -52,9 +52,10 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, CI.me
       x = temp$x ; y = temp$y
       mi.stat$theta[i] = AUC(x, y,...)
       n.x.vec[i] = length(x)
+      mi.stat$pXY[i] = p.XY(x,y)
       
       if ("NS1" %in% CI.method | "NS2" %in% CI.method ) {
-        mi.stat$pXY[i] = p.XY(x,y)
+      #??????  mi.stat$pXY[i] = p.XY(x,y)   ->>> check!!!!!!!!!!! what it was previous.
       }
       
       if ("Mee" %in% CI.method) {

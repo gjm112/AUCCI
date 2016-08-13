@@ -84,8 +84,6 @@ for (i in d1) {         #i: theta*phi
   }
 }
 result$n <- as.numeric(result$n)
-# head(result)
-# result[result$measure=="CIL" & result$Bm >=1,]
 
 #point estimates for bias check
 pointest$MI <- as.factor(pointest$MI)
@@ -103,15 +101,13 @@ ggplot(pointest.avg[pointest.avg$MI %in% c("naive","complete", "PMM", "LR", "NOR
   geom_point(aes(colour = factor(MI), shape=factor(MI)), size = 3) + 
   geom_segment(aes(x=0, xend=5, y=AUC.hat, yend=AUC.hat, label=NULL), size=1,  
                data=AUC.data) +
-  # geom_abline(intercept = AUC.data$AUC.hat, slope=0,  data=AUC.data) +
-  # geom_abline(intercept = 0.8, slope=0) + geom_abline(intercept = 0.9, slope=0) + 
-  # geom_abline(intercept = 0.95, slope=0) + geom_abline(intercept = 0.99, slope=0) + 
   theme(axis.text.x = element_blank(),axis.ticks = element_blank(),
         panel.background = element_rect(fill = "white"),
         panel.grid.major = element_line(colour = "grey80")) +
   scale_x_discrete(NULL) +
   ylab("Average AUC estimate")
 ggsave("R/plot_bias.png", width = 200, height = 100, units = "mm")
+
 
 ## reshaping: wide to long
 rst = melt(result, id =c("theta","phi","rho","n","MI","measure"))
@@ -142,96 +138,16 @@ rst3.avg[,1:2] <- rst3.avg[,c(2,1)]
 names(rst3.avg)[1:2] <- c("MI","CI.method")
 rst3.avg[,-(1:2)] <- round(rst3.avg[,-(1:2)],3)
 
-if (FALSE) {   # skip...
-  # collapsing three theta's into a column
-  for (msmt in measurement2) {      #measurement2 : CP, CP.MAE, LNCP, RNCP, CIL
-    if (msmt == "CP") {col=3:6}
-    else {col = grep(msmt, names(rst3.avg))}
-    rst3.avg[,msmt] <- do.call(paste, c(rst3.avg[col], sep=", "))
-  }
-  rst3.avg <- rst3.avg[,c("MI","CI.method",measurement2)]
-}
-
-# for (MI in MIset) {
-#   print(xtable(rst3.avg[rst3.avg==MI,-1], caption=MI), include.rownames = FALSE)
-# }
-
 # transpose : wide to long
-{
-  rst4.avg = t(as.matrix(rst3.avg))
-  rst4.avg = cbind (rownames(rst4.avg),rownames(rst4.avg),rst4.avg)
-  rst4.avg[,1] = c("MI","CI.method",rep("CP",4),rep("CP.MAE",4),rep("LNCP",4),rep("RNCP",4),rep("CIL",4))
-  rst4.avg[,2] = c("MI","CI.method",rep(c(.8,.9,.95,.99),5))
-  rownames(rst4.avg) <- NULL
-  
-  for (MI in MIset) {
-    print(xtable(rst4.avg[-1,c(1,2,which(rst4.avg[1,]==MI))], caption=MI), include.rownames = FALSE)
-  }  
+rst4.avg = t(as.matrix(rst3.avg))
+rst4.avg = cbind (rownames(rst4.avg),rownames(rst4.avg),rst4.avg)
+rst4.avg[,1] = c("MI","CI.method",rep("CP",4),rep("CP.MAE",4),rep("LNCP",4),rep("RNCP",4),rep("CIL",4))
+rst4.avg[,2] = c("MI","CI.method",rep(c(.8,.9,.95,.99),5))
+rownames(rst4.avg) <- NULL
+
+for (MI in MIset) {
+  print(xtable(rst4.avg[-1,c(1,2,which(rst4.avg[1,]==MI))], caption=MI), include.rownames = FALSE)
 }
-
-
-
-if(FALSE){
-  rst <- reshape(rst, v.names = "value", idvar = c("phi","rho","n", "MI", "CI.method"), timevar = "theta", direction = "wide")
- # rst2: Wald, MIset
- rst2 <- rst[(rst$CI.method %in% Wald) & (rst$MI %in% MIset),]
- aggregate(cbind(0.8, 0.9, 0.95, 0.99) ~ CI.method + MI, FUN=MAE, data=rst2[rst2$measure=="CP",])
- 
- aggregate(data=rst2[rst2$measure=="CP",], 
-           by = data[,c("MI","CI.method","measure")],
-           FUN=mean, na.rm=TRUE)
-}
-
-
-
-## calculating deviations(Actual CP - Nominal CP)
-result.dev = melt(result, id =c("theta","phi","rho","n","MI","measure"))
-names(result.dev)[7] = "CI.method"
-result.dev$CI.method <- as.factor(result.dev$CI.method)
-result.dev = result.dev[result.dev$measure=="CP",]
-result.dev[,8] <- result.dev[,8]-.95
-result.dev[,"measure"] <- "CP.dev"
-
-# Filtering Wald type CI's only
-result.Wald <- result.dev[result.dev$CI.method %in% Wald,]
-
-
-
-
-## MAE(mean absolute error)
-agg.CMn <- aggregate(value~CI.method+theta+MI+n, FUN=MAE,data=result.Wald)
-
-
-agg.CM <- aggregate(value~CI.method+theta+MI, FUN=MAE,data=result.Wald)
-agg.CMn <- aggregate(value~CI.method+theta+MI+n, FUN=MAE,data=result.Wald)
-for (i in 1:6) { for (j in 1:3) {
-  with(agg.CMn[agg.CMn$MI==mi.names[i] & agg.CMn$n==n[j] & agg.CMn$CI.method=="Bm",], 
-       plot(value ~ theta, type="l", ylab="MAD", ylim=c(0,.2), main=paste0(mi.names[i], ", n= ", n[j])))
-  for(l in Wald) {
-    with(agg.CMn[agg.CMn$MI==mi.names[i] & agg.CMn$n==n[j] & agg.CMn$CI.method==l,], 
-         points(value ~ theta, type="l", col=which(l==Wald)))    
-    abline(h=c(.02,.03,.04))
-  }
-  legend(.85, .2, Wald, pch=16, cex=.5, col=1:6)
-}}
-
-#plot(result.Wald$value ~ result.Wald$theta, type="l", ylim=c(.9,1),  xlab="theta=.8 .9 .95",)
-#for(l in mainplayers) {points(b[,CI.methods[l]], type="l", pch=16, col=l)}
-#abline(h=.95, lty=3)
-
-# Wald2 <- Wald[c(4,3,2,5,1)]
-# a <- result[result$measure %in% c("CP") & result$MI %in% c("pmm", "logreg"),c(names(result)[1:6],Wald2)]
-# for(i in seq(1,31,by=2))  {plot(1:5, a[i,7:11], ylim=c(.9,1), main=paste(a[i,1:4], collapse="-"));points(1:5, a[i+1,7:11], col="red");abline(h=.95)}
-# dim(a)
-
-
-
-
-## MSE(mean squared error)
-# aggregate(value~CI.method, FUN=MSE,data=result.Wald)
-
-## to see kind of bias = mean(nominal - actual CP)
-# aggregate(value~CI.method, FUN=mean,data=result.Wald)
 
 
 ## rst5

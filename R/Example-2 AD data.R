@@ -79,9 +79,10 @@ smp <- sample(1:dim(ADdata1)[1], 200)
 ### 2: CDRSUM marker/ complete variables only   3: CDRSUM marker/ all variables as covariates
 ### 4: CDRGLOB marker/ complete variables only  5: CDRGLOB marker/ all variables as covariates
 
-MIseed = 100
-
-### ADdata2: with complete variables only. CDRSUM as the biomarker. randomly chosen 200 obs only
+if (FALSE) {
+  MIseed = 100
+  
+  ### ADdata2: with complete variables only. CDRSUM as the biomarker. randomly chosen 200 obs only
   ADdata2 <- ADdata1[smp, c("NACCID","NACCETPR","CDRSUM","SEX","NACCNIHR","SMOKYRS","NACCAGE")]
   names(ADdata2)[2] <- "diseaseR"
   names(ADdata2)[3] <- "marker"
@@ -93,16 +94,23 @@ MIseed = 100
   ADdata2.pmm <- lapply(1:10, function(x) complete(tmp, action=x))
   ADdata2.pmm.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata2.pmm, CI.method=x)$CI)))
   apply(ADdata2.pmm.CI,1,mean)[1]   #AUC.hat
-  ADdata2.pmm.CI
+  ADdata2.pmm.CI  
+}
+
 
 ### ADdata3: with all variables. CDRSUM as the biomarker (and excluding CDRGLOB). randomly chosen 200 obs only
   ADdata3 <- ADdata1[smp, c("NACCID","NACCETPR","CDRSUM","SEX","NACCNIHR","SMOKYRS","NACCAGE","NACCMMSE","EDUC","NACCFAM","BPSYS","HRATE","NACCGDS","NACCAMD","NACCBMI", "PDNORMAL")]
   names(ADdata3)[2] <- "diseaseR"
   names(ADdata3)[3] <- "marker"
-  
+  # Forcing multicategorical variable into binary
+  ADdata3$NACCNIHR2 <- 0
+  ADdata3$NACCNIHR2[ADdata3$NACCNIHR==1] <- 1
+  ADdata3$NACCNIHR2[is.na(ADdata3$NACCNIHR)] <- NA
+  ADdata3$NACCNIHR <- NULL
+
   table(ADdata3$diseaseR, useNA="always")
   mean(is.na(ADdata3$diseaseR))                     # missing coverage
-  mean(as.numeric(ADdata3$diseaseR), na.rm=TRUE)  # prevalence rate of the observed
+  mean(as.numeric(ADdata3$diseaseR), na.rm=TRUE)-1  # prevalence rate of the observed
 
   predM = 1 - diag(1, ncol(ADdata3)); predM[,1] <- 0 # ignoring the ID when predicting
   set.seed(MIseed)
@@ -147,14 +155,14 @@ if (FALSE) {
 ### naive estimator (= 0.6435 and 0.6122)
 AUC(data=ADdata2, disease="diseaseR") #CDRSUM as biomarker
 AUC(data=ADdata3, disease="diseaseR") #CDRSUM as biomarker
-AUC(data=ADdata4, disease="diseaseR") #CDRGLOB as biomarker
-AUC(data=ADdata5, disease="diseaseR") #CDRGLOB as biomarker
+# AUC(data=ADdata4, disease="diseaseR") #CDRGLOB as biomarker
+# AUC(data=ADdata5, disease="diseaseR") #CDRGLOB as biomarker
 
 
 ### pmm, lr, norm
 predM = 1 - diag(1, ncol(ADdata3)); predM[,1] <- 0 # ignoring the ID when predicting
 set.seed(MIseed)
-method.tmp = rep("pmm",16); method.tmp[c(2,4,10,16)] <- "logreg"
+method.tmp = rep("pmm",16); method.tmp[c(2,4,9,15, 16)] <- "logreg"
 tmp <- mice(ADdata3, m=10, method=method.tmp, printFlag=F, predictorMatrix=predM)
 
 set.seed(MIseed)
@@ -164,8 +172,24 @@ apply(ADdata3.lr.CI,1,mean)[1]   #AUC.hat
 ADdata3.lr.CI
 
 set.seed(MIseed)
-ADdata3$diseaseR <- as.numeric(ADdata3$diseaseR)
-ADdata3.NORM <- MI.norm(ADdata3[,-1], m=10, rounding="adaptive", showits=F)
+ADdata3$diseaseR <- as.numeric(as.character(ADdata3$diseaseR))
+ADdata3$SEX <- as.numeric(as.character(ADdata3$SEX))
+ADdata3$NACCFAM <- as.numeric(as.character(ADdata3$NACCFAM))
+ADdata3$PDNORMAL <- as.numeric(as.character(ADdata3$PDNORMAL))
+
+
+
+# creating dummies for multi-categorical variables (NACCNIHR)
+# ADdata3$NIHR7 <- ADdata3$NIHR6 <- ADdata3$NIHR5 <- ADdata3$NIHR4 <- ADdata3$NIHR3 <- ADdata3$NIHR2 <- ADdata3$NIHR1 <- 0
+#  ADdata3$NIHR1[ADdata3$NACCNIHR==1] <- 1
+#  ADdata3$NIHR2[ADdata3$NACCNIHR==2] <- 1
+#  ADdata3$NIHR3[ADdata3$NACCNIHR==3] <- 1
+#  ADdata3$NIHR4[ADdata3$NACCNIHR==4] <- 1
+#  ADdata3$NIHR5[ADdata3$NACCNIHR==5] <- 1
+#  ADdata3$NIHR6[ADdata3$NACCNIHR==6] <- 1
+#  ADdata3$NIHR7[is.na(ADdata3$NACCNIHR)] <- 1
+
+ADdata3.NORM <- MI.norm2(data=ADdata3[,-1], m=10, rounding="adaptive", showits=F) #NACCNIHR2(17th col) instead of NACCNIHR(5th)
 ADdata3.NORM.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata3.NORM, CI.method=x)$CI)))
 apply(ADdata3.NORM.CI,1,mean)[1]   #AUC.hat
 ADdata3.NORM.CI
@@ -216,8 +240,8 @@ p + facet_grid(MI ~ .) +
         panel.grid.major = element_line(colour = "grey80"),
         legend.position="none")+
   #scale_color_discrete(name="CI methods") +
-  geom_text(data=ADdata3.CI, x=0.45, y=ADdata3.CI$no, aes(label=CI.method), show.legend = FALSE) +
+  geom_text(data=ADdata3.CI, x=0.77, y=ADdata3.CI$no, aes(label=CI.method), show.legend = FALSE) +
   xlim(c(0.4,1.0))
 
 
-ggsave("R/AD_plot.png", width = 200, height = 100, units = "mm")
+ggsave("R/plot_AD.png", width = 200, height = 100, units = "mm")

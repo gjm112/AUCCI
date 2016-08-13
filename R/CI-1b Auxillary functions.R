@@ -92,8 +92,9 @@ adp.round <- function(x, rounding="simple", vec=x) {
   return(x)
 }
 
+# by imp.norm
 MI.norm <- function(data, m=5, rounding="simple", rnd.vec = "diseaseR", return.vec=c("diseaseR","marker"),
-                    rngseed=abs(round(rnorm(1)*10^5))+1, showits=FALSE) {
+                    rngseed=abs(round(rnorm(1)*10^5))+1, showits=FALSE, maxit=1, ...) {
   # preliminary settings
   rngseed(rngseed)
   data.mat <- data.matrix(data)
@@ -105,3 +106,18 @@ MI.norm <- function(data, m=5, rounding="simple", rnd.vec = "diseaseR", return.v
   data.comp = lapply(data.comp, function(data) {data[,rnd.vec] = adp.round(data[,rnd.vec], rounding=rounding); return(data[,return.vec])}) # limiting the prediction range to [0,1]
 }
 
+# by da.norm (unlike imp.norm, da.norm goes through iterations(no.=maxit) by MCMC algorithm)
+MI.norm2 <- function(data, m=5, rounding="simple", rnd.vec = "diseaseR", return.vec=c("diseaseR","marker"),
+                    rngseed=abs(round(rnorm(1)*10^5))+1, showits=FALSE, maxit=5) {
+  # preliminary settings
+  rngseed(rngseed)
+  data.mat <- data.matrix(data)
+  s <- prelim.norm(data.mat)
+  mle <- em.norm(s, showits=showits)
+  
+  data.comp = lapply(1:m, function(a) {y.mis = da.norm(s = s, start = mle, steps=maxit, showits=showits, return.ymis=TRUE)$ymis
+                                        data[is.na(data)] <- y.mis
+                                        return(data)})   # multiple imputations
+  # data.comp = lapply(data.comp, function(data) {data[,rnd.vec] = pmax(pmin(data[,rnd.vec],1),0); return(data)}) # limiting the prediction range to [0,1]
+  data.comp = lapply(data.comp, function(data) {data[,rnd.vec] = adp.round(data[,rnd.vec], rounding=rounding); return(data[,return.vec])}) # limiting the prediction range to [0,1]
+}
