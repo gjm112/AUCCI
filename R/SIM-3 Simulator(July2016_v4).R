@@ -33,11 +33,22 @@ param1 = list(alphabet = data.frame(phi = rep(c(.5,.7), each=4),
                                     alpha0 = rep(c(0,1.6111), each=4), 
                                     beta1=c(0.8089, 1.4486, 1.97674, 2.96704, .8319, 1.47286, 2.00192, 2.9939)), 
               gamma = data.frame(q1 = c(.7, .8), q2 = c(.8, .9), q3=c(.7, .8), q4=c(.8, .9), gamma = c(.7, .8), rho = c(.5, .7)))
+
+# for small test (lambda for specific params only)
+#param1 = list(alphabet = data.frame(phi = .5, 
+#                                    theta = c(0.89999851), 
+#                                    theta.SE =c(4.09076E-06),
+#                                    alpha0 = 0, 
+#                                    beta1=1.4486), 
+#              gamma = data.frame(q1 = c(.7), q2 = c(.8), q3=c(.7), q4=c(.8), gamma = c(.7), rho = c(.5)))
+
+
 # alpha0 = 0 for phi==0, alpha0 = 1.6111 for phi==.7
 # q3= q1, q4= q2: MAR settings
 
 ## 2.3.1.2 Param2 - Simulation ###########################################################
 n = c(200, 100, 50)
+# n = 200
 alpha = 0.05
 # CI.methods from 1-1 [CI] Base functions.R
 # CI.methods = c("Bm", "HM1", "HM2", "NS1", "NW", "NS2", "Mee", "DL", "RG", "DB", "DG", "CM")
@@ -75,7 +86,7 @@ debug.ijh <- rep(NA,3)
 debug.l <- debug.k <- NA
 
 sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method, alpha, n,
-                       imputation, MI.method, Dir, m, Dir.method, R) {
+                       imputation, MI.method, Dir, m, Dir.method, R, print.lambda=FALSE) {
   debug.ijh <<- c(i,j,h)
   
   ### 1. basic setting
@@ -101,6 +112,12 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
   temp.estMI <- lapply(MI.method, function(l) {a <- as.data.frame(matrix(NA,n.sim,(length(CI.methods)*2+1))) 
                                                names(a) <- c("AUC.hat",paste0(rep(CI.methods,each=2),c(".lb",".ub"))); return(a)})
   names(temp.estMI) <- MI.method
+  if (print.lambda) {
+    temp.estMI.ld <- lapply(MI.method, function(l) {a <- as.data.frame(matrix(NA,n.sim,(length(CI.methods)))) 
+                                                 names(a) <- CI.methods; return(a)})
+    names(temp.estMI.ld) <- MI.method
+  }  
+  
   
   # for C-Dir: Direct Approaches
   temp.estDir.BCA <- temp.estDir.Wald <-  as.data.frame(matrix(NA,n.sim,(length(Dir.methods)*2+1)))
@@ -118,9 +135,9 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
     # A-Gen. Data generation(from 2.)
     temp <- datagenerator(n=n[h], alpha0=alpha0, alpha1=alpha1, beta0=beta0, beta1=beta1, beta2=beta2, beta3=beta3, sig=sig, q1=q1, q2=q2, q3=q3, q4=q4, gamma=gamma, mu.V=mu.V, Sigma=Sigma, option="VDTR")
     # A-Est: Inferences (complete datasets)
-    temp.est.com[k,] <- CI.i(temp, fun=AUCCI, CI.method=CI.method, alpha=alpha, type="landscape2")
+    temp.est.com[k,] <- CI.i(temp, fun=AUCCI, CI.method=CI.method, alpha=alpha, type="landscape2")$CI
     # A-Est2 (naive estimator)
-    temp.est.na[k,] <- CI.i(temp, fun=AUCCI, CI.method=CI.method, disease="diseaseR", alpha=alpha, type="landscape2")      
+    temp.est.na[k,] <- CI.i(temp, fun=AUCCI, CI.method=CI.method, disease="diseaseR", alpha=alpha, type="landscape2")$CI      
     
     
     ####### counter ######
@@ -162,7 +179,9 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
         if (nonimputable[[l]]) {
           temp.estMI[[l]][k,] <- NA
         } else {
-          temp.estMI[[l]][k,] <- CI.i(temp.MI[[l]], fun=AUCCI.MI, CI.method=CI.method, m=m, alpha=alpha, type="landscape2")
+          tmp <- CI.i(temp.MI[[l]], fun=AUCCI.MI, CI.method=CI.method, m=m, alpha=alpha, type="landscape2", lambda=print.lambda)
+          temp.estMI[[l]][k,] <- tmp$CI
+          if (print.lambda) {temp.estMI.ld[[l]][k,] <- tmp$lambda}
         }
       }
       
@@ -181,6 +200,7 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
   temp.d4 <- list(parm = data.frame(theta=theta, phi=phi, gamma=gamma, rho=rho, n=n[h]), est.com = temp.est.com, est.na = temp.est.na)
   if (imputation==TRUE) {
     temp.d4[["est.MI"]] = temp.estMI
+    if (print.lambda) {temp.d4[["est.MI.ld"]] = temp.estMI.ld}
   }
   if (Dir==TRUE)        {
     temp.d4[["est.Dir.BCA"]] = temp.estDir.BCA
@@ -203,17 +223,18 @@ sim.by.ijh <- function(i, j, h, d123, pb, pb.text, param, mu.V, Sigma, CI.method
     names(temp.eval)[if(imputation) {c(8,9)} else{c(3,4)}] <- paste0("theta=",round(theta,2),", phi=",phi,", rho=",rho,", n=",n[h],c(", 7. Bootstrap-BCA", ", 8. Bootstrap-Wald"))
   } #Dir==TRUE
   temp.d4$eval <- temp.eval
+  
   return(temp.d4)
 }
 
-
+n.sim=10000
 ## 2.3.2.2 Simulation package (Data generation + Inference + Evaluation)  ################
 count <- 1   # for time checking in dopar
 
 pb <- txtProgressBar(min=0, max = length(d1)*length(d2), style=3)
 for (i in d1) {
-#  if (i > 6) {    # break and resume by controlling numbers
   for (j in d2) {
+if ((i+j>=9)) {    # break and resume by controlling numbers
     if (parallel) {cl <- makeSOCKcluster(4)}      # for parallel
     if (parallel) {registerDoSNOW(cl)}            # for parallel
     print(c(i,j, paste0("out of ", length(d1),"x", length(d2))))
@@ -227,7 +248,7 @@ for (i in d1) {
         set.seed(i*j*h*100)
         sim.by.ijh (i=i, j=j, h=h, d123=d123, pb=pb, pb.text=pb.text, param=param1, mu.V=mu.V, Sigma=Sigma, CI.method=CI.methods, alpha=alpha, n=n,
                     imputation=imputation, MI.method = MI.methods[,"methods"], 
-                    Dir=Dir, m=m, Dir.method=Dir.methods, R=R)
+                    Dir=Dir, m=m, Dir.method=Dir.methods, R=R, print.lambda=FALSE)
       }      
     } else {
       temp.d3  <- foreach (h=d3, .packages=exp.packages, .export=exp.functions2) %do% {
@@ -239,16 +260,18 @@ for (i in d1) {
     }
 
     if (parallel) {stopCluster(cl)}               # for parallel
-    saveRDS(temp.d3, paste0("R/Simdata5/sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
+    saveRDS(temp.d3, paste0("R/Simdata8/sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
     # Time stat
     elapsed = Sys.time()-bgn
     expected = bgn + elapsed/((i-1)*2+j)*12
     print(paste0("bgn: ", format(bgn,"%m/%d %H:%M"), ", elapsed: ", round(elapsed,1), " min's, expected: ", format(expected,"%m/%d %H:%M"), ", i: ", paste(i,"in", length(d1)), ", j: ", paste(j,"in", length(d2)) ))
     
     temp.d2[[j]] <- temp.d3
+    } # break and resume
   } # j in d2
   temp.d1[[i]] <- temp.d2
-# } # break and resume
+
 } # i in d1
+
 # sim.data = temp.d1; rm(temp.d1,temp.d2)
 

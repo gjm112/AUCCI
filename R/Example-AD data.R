@@ -6,7 +6,7 @@ library(reshape2)
 library(xtable)
 
 # data step
-ADdata <- read.csv("NACC_cho06172016.csv", header=T)
+ADdata <- read.csv("NACC_cho08192016.csv", header=T)
 
 #### Longitudinal data to Cross-sectional (1st visit only)
 # 111,223 obs -> 33,900 obs
@@ -46,12 +46,20 @@ ADdata1$NACCNIHR <- NULL
 ADdata1$NACCGDS[ADdata1$NACCGDS %in% c(88,-4)] <- NA
 ADdata1$NACCMMSE[ADdata1$NACCMMSE %in% c(31:100,-4)] <- NA
 
-# NACCETPR: disease status
+# NACCETPR: supplementary disease info
 ADdata1$NACCETPR[ADdata1$NACCETPR %in% c(80:100)] <- NA # missing
 ADdata1$NACCETPR[ADdata1$NACCETPR %in% c(2:30)] <- 0    # symptoms other than AD
 ADdata1$NACCETPR <- as.factor(ADdata1$NACCETPR)
 #rho (missing ratio) 48.2% missing
 mean(is.na(ADdata1$NACCETPR))
+
+# NPADNC: disease status - golden standard test
+ADdata1$NPADNC[ADdata1$NPADNC %in% c(-4,8,9)] <- NA # missing
+ADdata1$disease <- ADdata1$NPADNC
+ADdata1$disease[ADdata1$disease %in% c(1,2,3)] <- 1   # AD
+ADdata1$disease <- as.factor(ADdata1$disease)
+#rho (missing ratio) 48.2% missing
+mean(is.na(ADdata1$disease))
 
 # ADdata1$NACCNIHR[ADdata1$NACCNIHR == 99] <- NA
 # ADdata1$NACCNIHR <- as.factor(ADdata1$NACCNIHR)
@@ -63,19 +71,20 @@ ADdata1$NACCAMD[ADdata1$NACCAMD %in% c(-4)] <- NA # missing
 ADdata1$NACCBMI[ADdata1$NACCBMI %in% c(999,-9)] <- NA # missing
 
 # reordering, dropping out unnecessary variables
-ADdata1 <- ADdata1[,c("NACCID","NACCETPR","CDRSUM","CDRGLOB","SEX","NACCNIHR2","SMOKYRS","NACCAGE","NACCMMSE","EDUC","NACCFAM","BPSYS","HRATE","NACCGDS","NACCAMD","NACCBMI", "PDNORMAL")]
+# ADdata1 <- ADdata1[,c("NACCID","NACCETPR","CDRSUM","CDRGLOB","SEX","NACCNIHR2","SMOKYRS","NACCAGE","NACCMMSE","EDUC","NACCFAM","BPSYS","HRATE","NACCGDS","NACCAMD","NACCBMI", "PDNORMAL")]
 # ID: NACCID
 # disease status: NACCETPR
 # biomarker candidates:CDRSUM(complete), CDRGLOB(complete), NACCMMSE(incomplete)
 # complete/incomplete: NACCID~NACCAGE (complete), NACCMMSE ~ PDNORMAL (incomplete)
 
-## randomly choosing 200 obs
-set.seed(10000)
-smp <- sample(1:dim(ADdata1)[1], 200)
-
-
+## randomly choosing one of the centers (NACCADC)
+set.seed(1000)
+smp <- sample(unique(ADdata1$NACCADC),1)
+smp
 ### ADdata1: 200 random obs, CDRSUM marker/ all variables as covariates
-ADdata1 <- ADdata1[smp, c("NACCID","NACCETPR","CDRSUM","SEX","NACCNIHR2","SMOKYRS","NACCAGE","NACCMMSE","EDUC","NACCFAM","BPSYS","HRATE","NACCGDS","NACCAMD","NACCBMI", "PDNORMAL")]
+ADdata1 <- ADdata1[ADdata1$NACCADC==smp, c("NACCID","disease","CDRSUM","SEX","NACCETPR", "NACCNIHR2","SMOKYRS","NACCAGE","NACCMMSE","EDUC","NACCFAM","BPSYS","HRATE","NACCGDS","NACCAMD","NACCBMI", "PDNORMAL")]
+#table(ADdata2$disease, useNA="always")
+
 names(ADdata1)[2] <- "diseaseR"
 names(ADdata1)[3] <- "marker"
 
@@ -101,7 +110,7 @@ ADdata1.pmm.CI
 ## 2. LR
 predM = 1 - diag(1, ncol(ADdata1)); predM[,1] <- 0 # ignoring the ID when predicting
 set.seed(MIseed)
-method.tmp = rep("pmm",16); method.tmp[c(2,4,5,10,16)] <- "logreg"
+method.tmp = rep("pmm",17); method.tmp[c(2,4,5,11,17)] <- "logreg"
 tmp <- mice(ADdata1, m=10, method=method.tmp, printFlag=F, predictorMatrix=predM)
 ADdata1.lr <- lapply(1:10, function(x) complete(tmp, action=x))
 ADdata1.lr.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata1.lr, CI.method=x)$CI)))

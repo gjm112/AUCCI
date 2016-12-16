@@ -2,7 +2,7 @@
 ## 1-2 [CI] AUCCI(Complete): 1.2.1 AUCCI, 1.2.2 CI.i
 
 ## 1.2.1 AUC CI #######################################################################
-AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.05, LT=FALSE, variance = FALSE, cc = FALSE, ...) {
+AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.05, LT=FALSE, variance = FALSE, cc = FALSE, lambda=FALSE, ...) {
   ### note for developers
   ## CI.method: "HanleyMcNeilWald", "HanleyMcNeilExponential", "HanleyMcNeilScore", ...
   ## variance: logical
@@ -10,8 +10,11 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
   ## cc: logical
   # continuity correction (for Wilson Score only)
   ## LT: logit transformation (HMW,HME, NE, HMS, NS, CM, Bb, MW, DL)  ( RG, HalpM, DB, DG, CP, WS)
+  ## lambda: logical, not an actual argument but used for compatibility with AUCCI.MI
+  
   # For Score-like methods(WS, HalpM) or parametric methods(RG,DB,DG), LT is not necessary.
   # returning variance when logit=T is var(logit(theta))
+  
   
   # basic stats
   x = data[data[,disease]==0, marker]
@@ -163,23 +166,52 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
 
 ## 1.2.2 lumpsum AUCCI for simulation purpose #########################################
 # CI's for individual elements of a sample (1. landscape form)  2 (lb,ub) x 17
-CI.i <- function(data, fun=AUCCI, CI.method=CI.methods, type="landscape2", ...) {
+CI.i <- function(data, fun=AUCCI, CI.method=CI.methods, type="landscape2", variance=FALSE, lambda=FALSE, ...) {
+  if (identical(fun, AUCCI)) {lambda=FALSE}
+  if (variance) {
+    var.i = as.data.frame(matrix(NA,1,length(CI.method)))
+    names(var.i) <- CI.method
+  }
+  if (lambda) {
+    lam.i = as.data.frame(matrix(NA,1,length(CI.method)))
+    nu.i = as.data.frame(matrix(NA,1,length(CI.method)))
+    names(lam.i) <- names(nu.i) <- CI.method
+  }
   if (type == "landscape1") {
     CI.i = as.data.frame(matrix(NA,2,length(CI.method)+1))
     names(CI.i) = c("AUC.hat", CI.method)
-    CI.i$AUC.hat = fun(data, CI.method = CI.method[1],...)$AUC.hat
-    for (i in 1:length(CI.method)) { CI.i[,i+1] = fun(data, CI.method = CI.method[i], ...)$CI }
+    CI.i$AUC.hat = fun(data, CI.method = CI.method[1], ...)$AUC.hat
+    for (i in 1:length(CI.method)) { 
+      tmp = fun(data, CI.method = CI.method[i], variance=variance, lambda=lambda, ...)
+      CI.i[,i+1] = tmp$CI
+      if (variance) {var.i[1,i] = tmp$V.hat}
+      if (lambda) {lam.i[1,i] = tmp$lambda; nu.i[1,i] = tmp$nu}
+    }
   } else if (type == "landscape2") {
     CI.i = as.data.frame(matrix(NA,1,length(CI.method)*2+1))
     names(CI.i) = c("AUC.hat",paste0(rep(CI.method,each=2),c(".lb",".ub")))
-    CI.i$AUC.hat = fun(data, CI.method = CI.method[1],...)$AUC.hat
-    for (i in 1:length(CI.method)) { CI.i[1,(2*i):(2*i+1)] = fun(data, CI.method = CI.method[i], ...)$CI }  
+    CI.i$AUC.hat = fun(data, CI.method = CI.method[1], ...)$AUC.hat
+    for (i in 1:length(CI.method)) { 
+      tmp = fun(data, CI.method = CI.method[i], variance=variance, lambda=lambda, ...)
+      CI.i[1,(2*i):(2*i+1)] = tmp$CI 
+      if (variance) {var.i[1,i] = tmp$V.hat}
+      if (lambda) {lam.i[1,i] = tmp$lambda; nu.i[1,i] = tmp$nu}
+    }  
   } else if (type=="portrait") {
     CI.i = as.data.frame(matrix(NA,length(CI.method)+1,2))
     names(CI.i) = c("lowerbound", "upperbound")
     rownames(CI.i)  = c("AUC.hat", CI.method)
-    CI.i[1,] = fun(data, CI.method = CI.method[1],...)$AUC.hat
-    for (i in 1:length(CI.method)) { CI.i[i+1,] = fun(data, CI.method = CI.method[i], ...)$CI }  
+    CI.i[1,] = fun(data, CI.method = CI.method[1], ...)$AUC.hat
+    for (i in 1:length(CI.method)) { 
+      tmp = fun(data, CI.method = CI.method[i], variance=variance, lambda=lambda, ...)
+      CI.i[i+1,] = tmp$CI
+      if (variance) {var.i[1,i] = tmp$V.hat}
+      if (lambda) {lam.i[1,i] = tmp$lambda; nu.i[1,i] = tmp$nu}
+    }  
   } else {stop("Form is none of landscape1, landscape2, or portrait")}    
-  return(CI.i)
+  
+  result = list(CI = CI.i)
+  if (variance) {result$var = var.i}
+  if (lambda) {result$lambda = lam.i; result$nu = nu.i}
+  return(result)
 }

@@ -14,7 +14,7 @@ MI.methods = data.frame(functions=c(rep("mice2",2),rep("MI.norm",3)), methods=c(
 ## 1.5.1 AUCCI.MI ##################################################################### 
 # For score types DO NOT use LT!!! very unstable for theta near 1
 
-AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, maxit=5, CI.method, alpha=.05, LT=FALSE, variance=FALSE, MI.thetas=FALSE, ...) {
+AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, maxit=5, CI.method, alpha=.05, LT=FALSE, variance=FALSE, MI.thetas=FALSE, lambda=FALSE, ...) {
   # note: predictorMatrix(for mice) should exclude disease
   # LT: logit transformation      # not available for RG
   # returning variance when logit=T is var(logit(theta))
@@ -30,7 +30,7 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, maxit
     }
     
     # 2. when multiple imutation needs to be done for a dataframe
-    # For convenience of one-time CI construction. Very unefficient for large size of simulation
+    # for convenience of one-time CI construction. very unefficient for large size of simulation
     else if (class(data) == "data.frame") {
       if (identical(MI.function, mice2)) {
         data.comp <- MI.function(data=data[,-1], method=MI.method, m=m, maxit=maxit, printFlag=FALSE,...)
@@ -53,10 +53,6 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, maxit
       mi.stat$theta[i] = AUC(x, y,...)
       n.x.vec[i] = length(x)
       mi.stat$pXY[i] = p.XY(x,y)
-      
-      if ("NS1" %in% CI.method | "NS2" %in% CI.method ) {
-      #??????  mi.stat$pXY[i] = p.XY(x,y)   ->>> check!!!!!!!!!!! what it was previous.
-      }
       
       if ("Mee" %in% CI.method) {
         mi.stat$N.J.hat[i] = Mee.stat(x, y)$N.J.hat
@@ -82,6 +78,7 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, maxit
     CI.Score = c("NS1", "NS2", "Mee")
     CI.root = c("DB", "DG")
     CI.other = c("RG")
+    lam <- nu <- NA # by default lamda and nu is set as NA, and is calculated if applicable
     if (CI.method %in% CI.Wald) {
       for (i in 1:m) {
         mi.stat$var.LT[i] = AUCCI(data.comp[[i]], CI.method=CI.method, disease="diseaseR", alpha=alpha, variance = TRUE, LT=LT, ...)$V.hat
@@ -90,15 +87,17 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, maxit
       mi.var.fin = mi.stat$var.LT[is.finite(mi.stat$var.LT)]
       # If every MI cases has unestimable variance(NA or Inf), Wald type CI can not be gotten.
       if (length(mi.var.fin) > 0) {
-        Rubin = Rubin(W=mean(mi.var.fin), MI=mi.stat$theta.LT, alpha=alpha, print.nu = TRUE)
+        Rubin = Rubin(W=mean(mi.var.fin), MI=mi.stat$theta.LT, alpha=alpha, print.r = TRUE, print.nu = TRUE, print.lambda = TRUE)
         var.MI.LT = Rubin$v.final         # W + (1/m)*B for MI
         if (is.na(var.MI.LT)) {
           CI <- CI.LT <- c(NA,NA)
         } else {
-          nu.LT = Rubin$nu             # degree of freedom for MI
-          if (is.na(nu.LT) & var.MI.LT==0) {nu.LT=Inf}
-          CI.LT = CI.base(mean.MI.LT, var.MI.LT, alpha, qt, df=nu.LT)    # logit scale (will back-transform in the end)
+          nu <- Rubin$nu             # degree of freedom for MI
+          r <- Rubin$r
+          if (is.na(nu) & var.MI.LT==0) {nu=Inf}
+          CI.LT = CI.base(mean.MI.LT, var.MI.LT, alpha, qt, df=nu)    # logit scale (will back-transform in the end)
           CI = expit(CI.LT, LT=LT)
+          lam = Rubin$lambda
         }
       } else {
         CI.LT <- CI <- c(NA,NA)
@@ -198,5 +197,6 @@ AUCCI.MI = function(data, MI.function, MI.method, score.MI = "fixed.r", m, maxit
   }
   
   result = list(AUC.hat = mean.MI, CI = CI);  if (variance) {result$V.hat = var.MI.LT}; if (MI.thetas) {result$theta.MI = mi.stat$theta; result$theta.LT = mi.stat$theta.LT }
+  if (lambda) {result$lambda = lam; result$nu = nu}
   return(result)
 }

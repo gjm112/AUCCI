@@ -6,23 +6,26 @@ library(norm)         # for Multiple Imputation
 
 # 1.1b.1 Combining Multiple imputations
 # variance estimator for multiple imputation
-Rubin = function(W, MI, alpha=0.05, print.r=FALSE, print.nu=FALSE) {
+Rubin = function(W, MI, alpha=0.05, print.r=FALSE, print.nu=FALSE, print.lambda=FALSE) {
   if (is.na(MI[1])) {     # in case it is not Multiple imputation, bypass Rubin!
     v.final = W
     z.val=qnorm(1-alpha/2)
     r = 0
     nu = NA
+    lambda = NA
   } else {
     m = length(MI)
     B = var(MI)
     v.final = W + B*(1+1/m)
     r = v.final / W  - 1   # missing ratio
-    nu = (m-1)*(1+1/r)
+    nu = (m-1)*(1+1/r)^2
     z.val = qt(1-alpha/2, nu)
+    lambda = (B*(1+1/m) + 2/(nu+3))/v.final
   }
   result = data.frame(v.final=v.final, z.val=z.val)
   if (print.r) {result$r = r}
   if (print.nu) {result$nu = nu}
+  if (print.lambda) {result$lambda = lambda}
   return(result)
 }
 

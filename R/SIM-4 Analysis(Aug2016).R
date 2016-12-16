@@ -4,11 +4,12 @@ library(xtable);
 library(ggplot2)
 MAE = function(CP.dev , theta=.95) {mean(abs(CP.dev - theta))}
 MSE = function(CP.dev) {sqrt(sum((CP.dev-theta)^2))/(length(CP.dev)-1)}
+CI.methods = c("Bm", "HM1", "HM2", "NW", "DL")
 Wald <- CI.methods
 MIset <- c("complete","naive","pmm","logreg", "adaptive")
 measurement <- c("CP", "LNCP", "RNCP", "CIL", "NaN", "ZWI")
 measurement2 <- c(measurement,"CP.MAE")[c(1,7,2,3,4)]
-CI.methods = c("Bm", "HM1", "HM2", "NW", "DL")
+
 
 ## combining evaluations in a sheet
 msmt = c("CP","LNCP","RNCP","NaN","CIL", "ZWI")
@@ -33,7 +34,7 @@ for (i in d1) {         #i: theta*phi
   th = round(param1$alphabet$theta[i],4); ph = param1$alphabet$phi[i]
   for (j in d2) {       #j: rho
     rh = param1$gamma$rho[j]
-    tmp <- readRDS(paste0("R/Simdata5/sim_data-Aug01-",i,j,".rds"))
+    tmp <- readRDS(paste0("R/Simdata_final/sim_data-Dec09-",i,j,".rds"))
     # CI lengths to be restricted within [0,1]
     for (h in d3){
       # truncation
