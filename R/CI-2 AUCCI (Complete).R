@@ -149,12 +149,11 @@ AUCCI <- function(data, CI.method, disease="disease", marker="marker", alpha=0.0
     CI = (2*n*A + z.a2^2 +cc*c(-1,1) +c(-1,1)* z.a2* sqrt(z.a2^2 + cc*c(-2,2) - 1/n*cc + 4*A*(n*(1-A) +1*cc)))/(2*(n+z.a2^2))
   }
   
-  # V for CP???
   else if (CI.method == "CP") {
     n = n.x + n.y; k = round(A * n)
     f1 = qf(alpha/2,2*k,2*(n-k+1))
     f2 = qf(1-alpha/2,2*(k+1),2*(n-k))
-    ##  V = ??
+    ##  V = TBD
     CI = c( (k*f1)/(n-k+1+k*f1), ((k+1)*f2)/(n-k+(k+1)*f2) )
   }
   ##### WilsonScore and ClopperPearson methods are excluded from this study ##########

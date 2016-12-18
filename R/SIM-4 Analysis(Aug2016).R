@@ -34,7 +34,7 @@ for (i in d1) {         #i: theta*phi
   th = round(param1$alphabet$theta[i],4); ph = param1$alphabet$phi[i]
   for (j in d2) {       #j: rho
     rh = param1$gamma$rho[j]
-    tmp <- readRDS(paste0("R/Simdata_final/sim_data-Dec09-",i,j,".rds"))
+    tmp <- readRDS(paste0("R/Simdata/sim_data-Dec09-",i,j,".rds"))
     # CI lengths to be restricted within [0,1]
     for (h in d3){
       # truncation

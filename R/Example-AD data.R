@@ -50,16 +50,19 @@ ADdata1$NACCMMSE[ADdata1$NACCMMSE %in% c(31:100,-4)] <- NA
 ADdata1$NACCETPR[ADdata1$NACCETPR %in% c(80:100)] <- NA # missing
 ADdata1$NACCETPR[ADdata1$NACCETPR %in% c(2:30)] <- 0    # symptoms other than AD
 ADdata1$NACCETPR <- as.factor(ADdata1$NACCETPR)
-#rho (missing ratio) 48.2% missing
-mean(is.na(ADdata1$NACCETPR))
 
 # NPADNC: disease status - golden standard test
 ADdata1$NPADNC[ADdata1$NPADNC %in% c(-4,8,9)] <- NA # missing
 ADdata1$disease <- ADdata1$NPADNC
 ADdata1$disease[ADdata1$disease %in% c(1,2,3)] <- 1   # AD
 ADdata1$disease <- as.factor(ADdata1$disease)
-#rho (missing ratio) 48.2% missing
+#rho (missing ratio) 97.1% missing
 mean(is.na(ADdata1$disease))
+# D 844 (2.5%), ND 135 (0.4%), missing 32921 (97%)
+table(ADdata1$disease,useNA="always")
+# P(D|obs)=86%
+mean(as.numeric(ADdata1$disease)-1,na.rm=TRUE)
+
 
 # ADdata1$NACCNIHR[ADdata1$NACCNIHR == 99] <- NA
 # ADdata1$NACCNIHR <- as.factor(ADdata1$NACCNIHR)
@@ -68,8 +71,8 @@ mean(is.na(ADdata1$disease))
 # 99=Unknown or ambiguous  -> not actually missing, but unclassified!
 
 ADdata1$NACCAMD[ADdata1$NACCAMD %in% c(-4)] <- NA # missing
-ADdata1$NACCBMI[ADdata1$NACCBMI %in% c(999,-9)] <- NA # missing
-
+ADdata1$NACCBMI[ADdata1$NACCBMI %in% c(999,888,-9,-4)] <- NA # missing
+ADdata1$NACCBMI[ADdata1$NACCBMI >=888] <- NA # missing (to handle 888.89999)
 # reordering, dropping out unnecessary variables
 # ADdata1 <- ADdata1[,c("NACCID","NACCETPR","CDRSUM","CDRGLOB","SEX","NACCNIHR2","SMOKYRS","NACCAGE","NACCMMSE","EDUC","NACCFAM","BPSYS","HRATE","NACCGDS","NACCAMD","NACCBMI", "PDNORMAL")]
 # ID: NACCID
@@ -78,76 +81,81 @@ ADdata1$NACCBMI[ADdata1$NACCBMI %in% c(999,-9)] <- NA # missing
 # complete/incomplete: NACCID~NACCAGE (complete), NACCMMSE ~ PDNORMAL (incomplete)
 
 ## randomly choosing one of the centers (NACCADC)
-set.seed(1000)
-smp <- sample(unique(ADdata1$NACCADC),1)
-smp
-### ADdata1: 200 random obs, CDRSUM marker/ all variables as covariates
-ADdata1 <- ADdata1[ADdata1$NACCADC==smp, c("NACCID","disease","CDRSUM","SEX","NACCETPR", "NACCNIHR2","SMOKYRS","NACCAGE","NACCMMSE","EDUC","NACCFAM","BPSYS","HRATE","NACCGDS","NACCAMD","NACCBMI", "PDNORMAL")]
+table(ADdata1$NACCADC, ADdata1$disease,useNA="always")
+
+# an ADC center example (4347)
+table(ADdata1$disease[ADdata1$NACCADC==4347],useNA="always")
+### ADdata2: ADC==4347, CDRSUM marker/ all variables as covariates
+ADdata2 <- ADdata1[ADdata1$NACCADC==4347, c("NACCID","disease","CDRSUM","SEX","NACCETPR", "NACCNIHR2","SMOKYRS","NACCAGE","NACCMMSE","EDUC","NACCFAM","BPSYS","HRATE","NACCGDS","NACCAMD","NACCBMI", "PDNORMAL")]
 #table(ADdata2$disease, useNA="always")
 
-names(ADdata1)[2] <- "diseaseR"
-names(ADdata1)[3] <- "marker"
+names(ADdata2)[2] <- "diseaseR"
+names(ADdata2)[3] <- "marker"
 
-table(ADdata1$diseaseR, useNA="always")
-mean(is.na(ADdata1$diseaseR))                     # missing coverage
-mean(as.numeric(ADdata1$diseaseR), na.rm=TRUE)-1  # prevalence rate of the observed
+table(ADdata2$diseaseR, useNA="always")
+mean(is.na(ADdata2$diseaseR))                     # missing coverage 93.4%
+mean(as.numeric(ADdata2$diseaseR), na.rm=TRUE)-1  # prevalence rate of the observed 83.6%
 
-## 0. naive estimator (= 0.67239)
-AUC(data=ADdata1, disease="diseaseR") #CDRSUM as biomarker
+## 0. naive estimator (= 0.589)
+AUC(data=ADdata2, disease="diseaseR") #CDRSUM as biomarker
 
 
 ## 1. PMM
-predM = 1 - diag(1, ncol(ADdata1)); predM[,1] <- 0 # ignoring the ID when predicting
+predM = 1 - diag(1, ncol(ADdata2)); predM[,1] <- 0 # ignoring the ID when predicting
 set.seed(MIseed)
-tmp <- mice(ADdata1, m=10, method="pmm", printFlag=F, predictorMatrix=predM)
+tmp <- mice(ADdata2, m=10, method="pmm", printFlag=F, predictorMatrix=predM)
 
-ADdata1.pmm <- lapply(1:10, function(x) complete(tmp, action=x))
-ADdata1.pmm.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata1.pmm, CI.method=x)$CI)))
-apply(ADdata1.pmm.CI,1,mean)[1]   #AUC.hat
-ADdata1.pmm.CI
+ADdata2.pmm <- lapply(1:10, function(x) complete(tmp, action=x))
+ADdata2.pmm.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata2.pmm, CI.method=x)$CI)))
+apply(ADdata2.pmm.CI,1,mean)[1]   #AUC.hat
+ADdata2.pmm.CI
 
 
 ## 2. LR
-predM = 1 - diag(1, ncol(ADdata1)); predM[,1] <- 0 # ignoring the ID when predicting
+predM = 1 - diag(1, ncol(ADdata2)); predM[,1] <- 0 # ignoring the ID when predicting
 set.seed(MIseed)
 method.tmp = rep("pmm",17); method.tmp[c(2,4,5,11,17)] <- "logreg"
-tmp <- mice(ADdata1, m=10, method=method.tmp, printFlag=F, predictorMatrix=predM)
-ADdata1.lr <- lapply(1:10, function(x) complete(tmp, action=x))
-ADdata1.lr.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata1.lr, CI.method=x)$CI)))
-apply(ADdata1.lr.CI,1,mean)[1]   #AUC.hat
-ADdata1.lr.CI
+tmp <- mice(ADdata2, m=10, method=method.tmp, printFlag=F, predictorMatrix=predM)
+ADdata2.lr <- lapply(1:10, function(x) complete(tmp, action=x))
+ADdata2.lr.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata2.lr, CI.method=x)$CI)))
+apply(ADdata2.lr.CI,1,mean)[1]   #AUC.hat
+ADdata2.lr.CI
 
 
 ## 3. NORM
 #As numeric for NORM
-ADdata1$diseaseR <- as.numeric(as.character(ADdata1$diseaseR))
-ADdata1$SEX <- as.numeric(as.character(ADdata1$SEX))
-ADdata1$NACCFAM <- as.numeric(as.character(ADdata1$NACCFAM))
-ADdata1$PDNORMAL <- as.numeric(as.character(ADdata1$PDNORMAL))
-ADdata1$NACCNIHR2 <- as.numeric(as.character(ADdata1$NACCNIHR2))
+ADdata2$diseaseR <- as.numeric(as.character(ADdata2$diseaseR))
+ADdata2$SEX <- as.numeric(as.character(ADdata2$SEX))
+ADdata2$NACCFAM <- as.numeric(as.character(ADdata2$NACCFAM))
+ADdata2$PDNORMAL <- as.numeric(as.character(ADdata2$PDNORMAL))
+ADdata2$NACCNIHR2 <- as.numeric(as.character(ADdata2$NACCNIHR2))
 
 set.seed(MIseed)
-ADdata1.NORM <- MI.norm2(data=ADdata1[,-1], m=10, rounding="adaptive", showits=F) #NACCNIHR2(17th col) instead of NACCNIHR(5th)
-ADdata1.NORM.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata1.NORM, CI.method=x)$CI)))
-apply(ADdata1.NORM.CI,1,mean)[1]   #AUC.hat
-ADdata1.NORM.CI
-#AUCCI(data=ADdata1.NORM[[1]], disease="diseaseR", CI.method="HM1", variance=T)
+ADdata2.NORM <- MI.norm2(data=ADdata2[,-1], m=10, rounding="adaptive", showits=F) #NACCNIHR2(17th col) instead of NACCNIHR(5th)
+ADdata2.NORM.CI <- as.data.frame(t(sapply (c("Bm", "HM1", "HM2", "NW", "DL"), function(x) AUCCI.MI(ADdata2.NORM, CI.method=x)$CI)))
+apply(ADdata2.NORM.CI,1,mean)[1]   #AUC.hat
+ADdata2.NORM.CI
+#AUCCI(data=ADdata2.NORM[[1]], disease="diseaseR", CI.method="HM1", variance=T)
 
 
 ## Combine all MIs
-ADdata1.CI <- rbind(ADdata1.pmm.CI,ADdata1.lr.CI,ADdata1.NORM.CI)
+ADdata2.CI <- rbind(ADdata2.pmm.CI,ADdata2.lr.CI,ADdata2.NORM.CI)
+ADdata2.CI
 
-names(ADdata1.CI) = c("lb", "ub")
-ADdata1.CI$CI.method = c("Bm", "HM1", "HM2", "NW", "DL")
-ADdata1.CI$no = c(5,3,2,1,4)   #numbering for labels in the order of abc
-ADdata1.CI$MI = rep(c("PMM","LR","NORM"), each=5)
-ADdata1.CI$MI <- as.factor(ADdata1.CI$MI)
-ADdata1.CI$MI <- factor(ADdata1.CI$MI,levels(ADdata1.CI$MI)[c(3,1,2)])
-ADdata1.CI$length = ADdata1.CI$ub - ADdata1.CI$lb
+names(ADdata2.CI) = c("lb", "ub")
+ADdata2.CI$CI.method = c("Bm", "HM1", "HM2", "NW", "DL")
+ADdata2.CI$no = c(5,3,2,1,4)   #numbering for labels in the order of abc
+ADdata2.CI$MI = rep(c("PMM","LR","NORM"), each=5)
+ADdata2.CI$MI <- as.factor(ADdata2.CI$MI)
+ADdata2.CI$MI <- factor(ADdata2.CI$MI,levels(ADdata2.CI$MI)[c(3,1,2)])
+ADdata2.CI$length = ADdata2.CI$ub - ADdata2.CI$lb
+
+## descriptive stats
+summary(ADdata2)
 
 
 ## table for LaTex
-table.AD <- reshape(ADdata1.CI[,-4], idvar =c("CI.method"), timevar="MI", direction="wide")
+table.AD <- reshape(ADdata2.CI[,-4], idvar =c("CI.method"), timevar="MI", direction="wide")
 table.AD <- rbind(table.AD, c(0,apply(table.AD[,-1],2,mean)))
 table.AD[6,1] <- "average"
 print(xtable(table.AD, digits = 4, caption="interval estimates of the AUC for the AD data"), include.rownames = FALSE)
@@ -155,16 +163,16 @@ print(xtable(table.AD, digits = 4, caption="interval estimates of the AUC for th
 
 ## plots
 vline.data = data.frame(AUC.hat = rep(NA,3), MI = c("PMM", "LR", "NORM"))
-vline.data$AUC.hat[1] <- mean(sapply(1:10, function(x) AUC(data=ADdata3.pmm[[x]], disease="diseaseR")))
-vline.data$AUC.hat[2] <- mean(sapply(1:10, function(x) AUC(data=ADdata3.lr[[x]], disease="diseaseR")))
-vline.data$AUC.hat[3] <- mean(sapply(1:10, function(x) AUC(data=ADdata3.NORM[[x]], disease="diseaseR")))
+vline.data$AUC.hat[1] <- mean(sapply(1:10, function(x) AUC(data=ADdata2.pmm[[x]], disease="diseaseR")))
+vline.data$AUC.hat[2] <- mean(sapply(1:10, function(x) AUC(data=ADdata2.lr[[x]], disease="diseaseR")))
+vline.data$AUC.hat[3] <- mean(sapply(1:10, function(x) AUC(data=ADdata2.NORM[[x]], disease="diseaseR")))
 
-AUC.naive <- AUC(data=ADdata1, disease="diseaseR")
+AUC.naive <- AUC(data=ADdata2, disease="diseaseR")
 
-p <- ggplot(xlim=c(0.4,1.0))
+p <- ggplot(xlim=c(min(ADdata2.CI$lb)-.05,0.9))
 p + facet_grid(MI ~ .) + 
   geom_segment(aes(x=lb, xend=ub, y=no, yend=no, color="grey", label=NULL), size=1.5,  
-               data=ADdata1.CI) +
+               data=ADdata2.CI) +
   geom_point(aes(AUC.hat, 1), color = "black", size = 2, data=vline.data) +
   geom_point(aes(AUC.hat, 2), color = "black", size = 2, data=vline.data) +
   geom_point(aes(AUC.hat, 3), color = "black", size = 2, data=vline.data) +
@@ -178,8 +186,8 @@ p + facet_grid(MI ~ .) +
         panel.grid.major = element_line(colour = "grey80"),
         legend.position="none")+
   #scale_color_discrete(name="CI methods") +
-  geom_text(data=ADdata1.CI, x=0.77, y=ADdata1.CI$no, aes(label=CI.method), show.legend = FALSE) +
-  xlim(c(0.4,1.0))
+  geom_text(data=ADdata2.CI, x=0.77, y=ADdata2.CI$no, aes(label=CI.method), show.legend = FALSE)+
+  xlim(c(min(ADdata2.CI$lb)-.05,0.9))
 
 
 ggsave("R/plot_AD.png", width = 200, height = 100, units = "mm")

@@ -11,7 +11,7 @@ exp.functions2 = c("Rubin", "S.stat")
 ########################################
 
 # Structure has changed since Nov 5.
-# Due to memory problem, For each single loop estimation is done. Don't wait until a large dataset is done.
+# Due to memory problem, For each single loop, estimation is done. Don't wait until a large dataset is done.
 
 ## 2.3.1. Parameters  ###################################################################
 ## 2.3.1.1 Param1 - Distributional #######################################################
@@ -34,17 +34,6 @@ param1 = list(alphabet = data.frame(phi = rep(c(.5,.7), each=4),
                                     beta1=c(0.8089, 1.4486, 1.97674, 2.96704, .8319, 1.47286, 2.00192, 2.9939)), 
               gamma = data.frame(q1 = c(.7, .8), q2 = c(.8, .9), q3=c(.7, .8), q4=c(.8, .9), gamma = c(.7, .8), rho = c(.5, .7)))
 
-# for small test (lambda for specific params only)
-#param1 = list(alphabet = data.frame(phi = .5, 
-#                                    theta = c(0.89999851), 
-#                                    theta.SE =c(4.09076E-06),
-#                                    alpha0 = 0, 
-#                                    beta1=1.4486), 
-#              gamma = data.frame(q1 = c(.7), q2 = c(.8), q3=c(.7), q4=c(.8), gamma = c(.7), rho = c(.5)))
-
-
-# alpha0 = 0 for phi==0, alpha0 = 1.6111 for phi==.7
-# q3= q1, q4= q2: MAR settings
 
 ## 2.3.1.2 Param2 - Simulation ###########################################################
 n = c(200, 100, 50)
@@ -55,8 +44,6 @@ alpha = 0.05
 CI.methods = c("Bm", "HM1", "HM2", "NW", "DL")
 # MI.methods from 1-5 [CI] AUCCI_MI  //MI.norm2(da.norm) instead of MI.norm(imp.norm)
 MI.methods = data.frame(functions=c(rep("mice2",2),rep("MI.norm2",3)), methods=c("pmm","logreg","simple","coinflip","adaptive"))
-# (run on July 26) MI.methods = data.frame(functions=c(rep("MI.norm2",3)), methods=c("simple","coinflip","adaptive"))
-
 
 m = 10
 # Direct methods with bootstrap. R = # of resamples
@@ -260,7 +247,7 @@ if ((i+j>=9)) {    # break and resume by controlling numbers
     }
 
     if (parallel) {stopCluster(cl)}               # for parallel
-    saveRDS(temp.d3, paste0("R/Simdata8/sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
+    saveRDS(temp.d3, paste0("R/Simdata/sim_data","-",format(Sys.time(), "%b%d"),"-",i,j,".rds"))
     # Time stat
     elapsed = Sys.time()-bgn
     expected = bgn + elapsed/((i-1)*2+j)*12
