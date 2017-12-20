@@ -12,10 +12,16 @@ MIset <- c("complete","naive","pmm","logreg", "adaptive")
 measurement <- c("CP", "LNCP", "RNCP", "CIL", "NaN", "ZWI")
 measurement2 <- c(measurement,"CP.MAE")[c(1,7,2,3,4)]
 
+param1 = list(alphabet = data.frame(phi = rep(c(.5,.7), each=4), 
+                                    theta = c(0.7999914248, 0.89999851, 0.950002331, 0.9900000165, 0.800002545, 0.899999218, 0.950000849, 0.989999545), 
+                                    theta.SE =c(5.80868E-06, 4.09076E-06, 2.76121E-06, 1.0662E-06, 7.79383E-06, 5.34159E-06, 3.42365E-06, 1.15113E-06),
+                                    alpha0 = rep(c(0,1.6111), each=4), 
+                                    beta1=c(0.8089, 1.4486, 1.97674, 2.96704, .8319, 1.47286, 2.00192, 2.9939)), 
+              gamma = data.frame(q1 = c(.85, .9, .99), q2 = c(.90, .95, .99), q3=c(.85, .9, .99), q4=c(.90, .95, .99), gamma = c(.9, .95, .95), rho = c(.5, .7, .9)))
 
 ## combining evaluations in a sheet
 msmt = c("CP","LNCP","RNCP","NaN","CIL", "ZWI")
-mi.names=c("complete","naive","pmm","logreg","simple","coinflip","adaptive")
+mi.names=c("complete","naive","pmm","logreg")  #NORM excluded
 n = c(200,100,50)
 d1 = 1:length(param1$alphabet$theta); d2 = 1:dim(param1$gamma)[1]; d3 = 1:length(n); d4 = 1:length(mi.names)
 
@@ -28,7 +34,7 @@ names(result) = c("theta","phi","rho","n","MI","measure",CI.methods)
 rownames(result) = NULL
 
 index=1; increment=length(msmt)
-pointest = as.data.frame(matrix(NA,288,6)) # 288 = theta(4)*phi(2)*rho(2)*n(3)*MI(6), 6: th,ph,rh,n,MI,AUC.hat
+pointest = as.data.frame(matrix(NA,288,6)) # 288 = theta(4)*phi(2)*rho(3)*n(3)*MI(4), 6: th,ph,rh,n,MI,AUC.hat
 names(pointest) = c("AUC","phi","rho","n","MI","AUC.hat")
 mmmm = 1 # row index for pointest
 
@@ -36,7 +42,7 @@ for (i in d1) {         #i: theta*phi
   th = round(param1$alphabet$theta[i],4); ph = param1$alphabet$phi[i]
   for (j in d2) {       #j: rho
     rh = param1$gamma$rho[j]
-    tmp <- readRDS(paste0("R/Simdata_final/sim_data-Dec09-",i,j,".rds"))
+    tmp <- readRDS(paste0("R2/Simdata/sim_data-1125-",i,j,".rds"))
     # CI lengths to be restricted within [0,1]
     for (h in d3){
       # truncation
@@ -44,18 +50,18 @@ for (i in d1) {         #i: theta*phi
       tmp[[h]]$est.na[tmp[[h]]$est.na>1] = 1 ; tmp[[h]]$est.na[tmp[[h]]$est.na<0] = 0
       tmp[[h]]$est.MI$pmm[tmp[[h]]$est.MI$pmm>1] = 1 ; tmp[[h]]$est.MI$pmm[tmp[[h]]$est.MI$pmm<0] = 0
       tmp[[h]]$est.MI$logreg[tmp[[h]]$est.MI$logreg>1] = 1 ; tmp[[h]]$est.MI$logreg[tmp[[h]]$est.MI$logreg<0] = 0
-      tmp[[h]]$est.MI$simple[tmp[[h]]$est.MI$simple>1] = 1 ; tmp[[h]]$est.MI$simple[tmp[[h]]$est.MI$simple<0] = 0
-      tmp[[h]]$est.MI$coinflip[tmp[[h]]$est.MI$coinflip>1] = 1 ; tmp[[h]]$est.MI$coinflip[tmp[[h]]$est.MI$coinflip<0] = 0
-      tmp[[h]]$est.MI$adaptive[tmp[[h]]$est.MI$adaptive>1] = 1 ; tmp[[h]]$est.MI$adaptive[tmp[[h]]$est.MI$adaptive<0] = 0
+      #tmp[[h]]$est.MI$simple[tmp[[h]]$est.MI$simple>1] = 1 ; tmp[[h]]$est.MI$simple[tmp[[h]]$est.MI$simple<0] = 0
+      #tmp[[h]]$est.MI$coinflip[tmp[[h]]$est.MI$coinflip>1] = 1 ; tmp[[h]]$est.MI$coinflip[tmp[[h]]$est.MI$coinflip<0] = 0
+      #tmp[[h]]$est.MI$adaptive[tmp[[h]]$est.MI$adaptive>1] = 1 ; tmp[[h]]$est.MI$adaptive[tmp[[h]]$est.MI$adaptive<0] = 0
       # getting average and then rounding to 4 decimal points
       lgth = length(CI.methods); lbcol = seq(2,2*lgth+1,2); ubcol = seq(3,2*lgth+1,2)
       tmp[[h]]$eval[[1]][5,] = round(apply(tmp[[h]]$est.com[,ubcol] - tmp[[h]]$est.com[,lbcol], 2, mean, na.rm=TRUE),4)
       tmp[[h]]$eval[[2]][5,] = round(apply(tmp[[h]]$est.na[,ubcol] - tmp[[h]]$est.na[,lbcol], 2, mean, na.rm=TRUE),4)
       tmp[[h]]$eval[[3]][5,] = round(apply(tmp[[h]]$est.MI$pmm[,ubcol] - tmp[[h]]$est.MI$pmm[,lbcol], 2, mean, na.rm=TRUE),4)
       tmp[[h]]$eval[[4]][5,] = round(apply(tmp[[h]]$est.MI$logreg[,ubcol] - tmp[[h]]$est.MI$logreg[,lbcol], 2, mean, na.rm=TRUE),4)
-      tmp[[h]]$eval[[5]][5,] = round(apply(tmp[[h]]$est.MI$simple[,ubcol] - tmp[[h]]$est.MI$simple[,lbcol], 2, mean, na.rm=TRUE),4)
-      tmp[[h]]$eval[[6]][5,] = round(apply(tmp[[h]]$est.MI$coinflip[,ubcol] - tmp[[h]]$est.MI$coinflip[,lbcol], 2, mean, na.rm=TRUE),4)
-      tmp[[h]]$eval[[7]][5,] = round(apply(tmp[[h]]$est.MI$adaptive[,ubcol] - tmp[[h]]$est.MI$adaptive[,lbcol], 2, mean, na.rm=TRUE),4)
+      #tmp[[h]]$eval[[5]][5,] = round(apply(tmp[[h]]$est.MI$simple[,ubcol] - tmp[[h]]$est.MI$simple[,lbcol], 2, mean, na.rm=TRUE),4)
+      #tmp[[h]]$eval[[6]][5,] = round(apply(tmp[[h]]$est.MI$coinflip[,ubcol] - tmp[[h]]$est.MI$coinflip[,lbcol], 2, mean, na.rm=TRUE),4)
+      #tmp[[h]]$eval[[7]][5,] = round(apply(tmp[[h]]$est.MI$adaptive[,ubcol] - tmp[[h]]$est.MI$adaptive[,lbcol], 2, mean, na.rm=TRUE),4)
       }
     
     for (h in d3) {     #h: n
@@ -67,9 +73,9 @@ for (i in d1) {         #i: theta*phi
       val[2] <- mean(tmp[[h]]$est.na$AUC.hat, na.rm = T)
       val[3] <- mean(tmp[[h]]$est.MI$pmm$AUC.hat, na.rm = T)
       val[4] <- mean(tmp[[h]]$est.MI$logreg$AUC.hat, na.rm = T)
-      val[5] <- mean(tmp[[h]]$est.MI$simple$AUC.hat, na.rm = T)
-      val[6] <- mean(tmp[[h]]$est.MI$coinflip$AUC.hat, na.rm = T)
-      val[7] <- mean(tmp[[h]]$est.MI$adaptive$AUC.hat, na.rm = T)
+      #val[5] <- mean(tmp[[h]]$est.MI$simple$AUC.hat, na.rm = T)
+      #val[6] <- mean(tmp[[h]]$est.MI$coinflip$AUC.hat, na.rm = T)
+      #val[7] <- mean(tmp[[h]]$est.MI$adaptive$AUC.hat, na.rm = T)
       
       for (l in d4) {   #l: mi methods
         mh = mi.names[l]
@@ -90,14 +96,14 @@ result$n <- as.numeric(result$n)
 
 #point estimates for bias check
 pointest$MI <- as.factor(pointest$MI)
-pointest$MI = factor(pointest$MI,levels(pointest$MI)[c(3,5,6,4,1,7,2)])
-levels(pointest$MI) <- c("complete","naive", "PMM", "LR", "NORM", "NORM(simple)", "NORM(coinflip)")
+pointest$MI = factor(pointest$MI,levels(pointest$MI)[c(1,3,4,2)])
+levels(pointest$MI) <- c("complete","naive", "PMM", "LR")
 pointest$AUC.hat <- as.numeric(pointest$AUC.hat)
 head(pointest)
 pointest.avg <- aggregate(AUC.hat ~ AUC + MI, mean, data=pointest)
 
 AUC.data <- data.frame(AUC.hat=c(.8,.9,.95,.99), AUC=c(.8,.9,.95,.99))
-ggplot(pointest.avg[pointest.avg$MI %in% c("naive","complete", "PMM", "LR", "NORM"),], 
+ggplot(pointest.avg[pointest.avg$MI %in% c("naive","complete", "PMM", "LR"),], 
        aes(MI, AUC.hat, label = round(AUC.hat,2))) + 
   geom_text(vjust = 0, nudge_y = 0.005, check_overlap = FALSE)+
   facet_grid(. ~ AUC, labeller=label_both) +
@@ -109,7 +115,7 @@ ggplot(pointest.avg[pointest.avg$MI %in% c("naive","complete", "PMM", "LR", "NOR
         panel.grid.major = element_line(colour = "grey80")) +
   scale_x_discrete(NULL) +
   ylab("Average AUC estimate")
-ggsave("R/plot_bias.png", width = 200, height = 100, units = "mm")
+ggsave("R2/plot_bias.png", width = 200, height = 100, units = "mm")
 
 
 ## reshaping: wide to long
@@ -121,7 +127,10 @@ names(rst)[7:10] <- paste0("v.",names(rst)[7:10])
 
 ## aggregating across phi, rho, n:  table(CI,MI,measure x theta)
 rst.avg <- aggregate(cbind(v.0.8,v.0.9,v.0.95,v.0.99) ~ CI.method + MI + measure, mean, data=rst)
-# aggregate(cbind(v.0.8,v.0.9,v.0.95,v.0.99) ~ CI.method + MI + measure + phi, mean, data=rst)
+# rho=50%
+# rst.avg <- aggregate(cbind(v.0.8,v.0.9,v.0.95,v.0.99) ~ CI.method + MI + measure, mean, data=rst[rst$rho==.5,])
+# rho=70%
+# rst.avg <- aggregate(cbind(v.0.8,v.0.9,v.0.95,v.0.99) ~ CI.method + MI + measure, mean, data=rst[rst$rho==.7,])
 
 
 # Calculate Mean Absolute Error for CP only and combine with rst.avg
@@ -148,22 +157,21 @@ rst4.avg[,1] = c("MI","CI.method",rep("CP",4),rep("CP.MAE",4),rep("LNCP",4),rep(
 rst4.avg[,2] = c("MI","CI.method",rep(c(.8,.9,.95,.99),5))
 rownames(rst4.avg) <- NULL
 
-for (MI in MIset) {
-  print(xtable(rst4.avg[-1,c(1,2,which(rst4.avg[1,]==MI))], caption=MI), include.rownames = FALSE)
-}
+print(xtable(do.call(rbind, lapply(MIset, function(MI) t(rst4.avg[c(1:10,19:22),c(1,2,which(rst4.avg[1,]==MI))]))), caption=MI),include.rownames = FALSE)
+
 
 
 ## rst5
 rst5 <- rst[(rst$CI.method %in% Wald) & (rst$MI %in% MIset),]
 rst5$MI <- as.factor(rst5$MI)
-rst5$MI = factor(rst5$MI,levels(rst5$MI)[c(2,4,5,3,1)])
+rst5$MI = factor(rst5$MI,levels(rst5$MI)[c(1,3,4,2)])
 
 # reshaping: wide to long
 rst5 <- reshape(rst5, varying=c("v.0.8","v.0.9","v.0.95","v.0.99"), direction="long", idvar=c("phi","rho","n","MI","CI.method", "measure"), sep=".0")
 rownames(rst5) <- NULL
 names(rst5)[7] = "theta"
 names(rst5)[8] = "value"
-levels(rst5$MI) <- c("complete data", "naive analysis", "PMM", "LR", "NORM")
+levels(rst5$MI) <- c("complete data", "naive analysis", "PMM", "LR")
 # rst5[,9] <- paste(rst5$MI, rst5$CI.method, sep="-")
 # names(rst5)[9] = "method"
 
@@ -173,8 +181,10 @@ rst5[, c("phi", "rho", "theta", "MI", "CI.method", "n")] <-
 
 rst5$phrh[rst5$phi==0.5 & rst5$rho==0.5] = "phi == '.5'~rho == '.5'"
 rst5$phrh[rst5$phi==0.5 & rst5$rho==0.7] = "phi == '.5'~rho == '.7'"
+rst5$phrh[rst5$phi==0.5 & rst5$rho==0.9] = "phi == '.5'~rho == '.9'"
 rst5$phrh[rst5$phi==0.7 & rst5$rho==0.5] = "phi == '.7'~rho == '.5'"
 rst5$phrh[rst5$phi==0.7 & rst5$rho==0.7] = "phi == '.7'~rho == '.7'"
+rst5$phrh[rst5$phi==0.7 & rst5$rho==0.9] = "phi == '.7'~rho == '.9'"
 
 rst5.phrh <- aggregate(value~phrh+theta+MI+CI.method+measure, FUN=mean,data=rst5) # across n
 rst5.n <- aggregate(value~n+theta+MI+CI.method+measure, FUN=mean,data=rst5) # across phi and rho
@@ -199,7 +209,7 @@ p.CP <- ggplot(rst5.phrh[rst5.phrh$measure == "CP",], aes(theta, value, group = 
   theme(legend.position="bottom")
   # geom_text(aes(theta, CP, label=paste("phi & rho", labs), group=NULL), size = 4, color = "grey50", data=dat, parse = T)
 p.CP
-ggsave("R/plot_CP_phirho.png", width = 200, height = 120, units = "mm")
+ggsave("R2/plot_CP_phirho.png", width = 200, height = 180, units = "mm")
 
 
 p.CIL <- ggplot(rst5.phrh[rst5.phrh$measure == "CIL",], aes(theta, value, group = CI.method)) + 
@@ -218,7 +228,7 @@ p.CIL <- ggplot(rst5.phrh[rst5.phrh$measure == "CIL",], aes(theta, value, group 
   theme_bw()  +
   theme(legend.position="bottom")
 p.CIL
-ggsave("R/plot_CIL_phirho.png", width = 200, height = 120, units = "mm")
+ggsave("R2/plot_CIL_phirho.png", width = 200, height = 180, units = "mm")
 
 
 
@@ -258,7 +268,7 @@ p.CIL.n <- ggplot(rst5.n[rst5.n$measure == "CIL",], aes(theta, value, group = CI
   theme(legend.position="bottom",strip.text.x = element_blank())
 p.CIL.n
 
-png("R/plot_n.png", width = 200, height = 200, res=1200, units = "mm")
+png("R2/plot_n.png", width = 200, height = 200, res=1200, units = "mm")
 grid.arrange(p.CP.n, p.CIL.n, nrow=2)
 dev.off()
 
@@ -281,7 +291,7 @@ p.CP.n.PMMLR <- ggplot(rst5.n[rst5.n$measure == "CP"&(rst5.n$MI == "PMM"|rst5.n$
   theme(legend.position="bottom")
 # geom_text(aes(theta, CP, label=paste("phi & rho", labs), group=NULL), size = 4, color = "grey50", data=dat, parse = T)
 p.CP.n.PMMLR
-ggsave("R/plot_CP_n_PMMLR.png", width = 200, height = 100, units = "mm")
+ggsave("R2/plot_CP_n_PMMLR.png", width = 200, height = 100, units = "mm")
 
 
 p.CIL.n.PMMLR <- ggplot(rst5.n[rst5.n$measure == "CIL"&(rst5.n$MI == "PMM"|rst5.n$MI == "LR"),], aes(theta, value, group = MI)) + 
@@ -300,5 +310,5 @@ p.CIL.n.PMMLR <- ggplot(rst5.n[rst5.n$measure == "CIL"&(rst5.n$MI == "PMM"|rst5.
   theme_bw()  +
   theme(legend.position="bottom")
 p.CIL.n.PMMLR
-ggsave("R/plot_CIL_n_PMMLR.png", width = 200, height = 100, units = "mm")
+ggsave("R2/plot_CIL_n_PMMLR.png", width = 200, height = 100, units = "mm")
 

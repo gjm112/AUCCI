@@ -36,7 +36,7 @@ for (i in d1) {         #i: theta*phi
   th = round(param1$alphabet$theta[i],4); ph = param1$alphabet$phi[i]
   for (j in d2) {       #j: rho
     rh = param1$gamma$rho[j]
-    tmp <- readRDS(paste0("R/Simdata_final/sim_data-Dec09-",i,j,".rds"))
+    tmp <- readRDS(paste0("R2/Simdata/sim_data-1125-",i,j,".rds"))
     # CI lengths to be restricted within [0,1]
     for (h in d3){
       # truncation
@@ -109,7 +109,7 @@ ggplot(pointest.avg[pointest.avg$MI %in% c("naive","complete", "PMM", "LR", "NOR
         panel.grid.major = element_line(colour = "grey80")) +
   scale_x_discrete(NULL) +
   ylab("Average AUC estimate")
-ggsave("R/plot_bias.png", width = 200, height = 100, units = "mm")
+ggsave("R2/plot_bias.png", width = 200, height = 100, units = "mm")
 
 
 ## reshaping: wide to long
@@ -121,7 +121,10 @@ names(rst)[7:10] <- paste0("v.",names(rst)[7:10])
 
 ## aggregating across phi, rho, n:  table(CI,MI,measure x theta)
 rst.avg <- aggregate(cbind(v.0.8,v.0.9,v.0.95,v.0.99) ~ CI.method + MI + measure, mean, data=rst)
-# aggregate(cbind(v.0.8,v.0.9,v.0.95,v.0.99) ~ CI.method + MI + measure + phi, mean, data=rst)
+# rho=50%
+# rst.avg <- aggregate(cbind(v.0.8,v.0.9,v.0.95,v.0.99) ~ CI.method + MI + measure, mean, data=rst[rst$rho==.5,])
+# rho=70%
+# rst.avg <- aggregate(cbind(v.0.8,v.0.9,v.0.95,v.0.99) ~ CI.method + MI + measure, mean, data=rst[rst$rho==.7,])
 
 
 # Calculate Mean Absolute Error for CP only and combine with rst.avg
@@ -148,9 +151,8 @@ rst4.avg[,1] = c("MI","CI.method",rep("CP",4),rep("CP.MAE",4),rep("LNCP",4),rep(
 rst4.avg[,2] = c("MI","CI.method",rep(c(.8,.9,.95,.99),5))
 rownames(rst4.avg) <- NULL
 
-for (MI in MIset) {
-  print(xtable(rst4.avg[-1,c(1,2,which(rst4.avg[1,]==MI))], caption=MI), include.rownames = FALSE)
-}
+print(xtable(do.call(rbind, lapply(MIset, function(MI) t(rst4.avg[c(1:10,19:22),c(1,2,which(rst4.avg[1,]==MI))]))), caption=MI),include.rownames = FALSE)
+
 
 
 ## rst5
@@ -199,7 +201,7 @@ p.CP <- ggplot(rst5.phrh[rst5.phrh$measure == "CP",], aes(theta, value, group = 
   theme(legend.position="bottom")
   # geom_text(aes(theta, CP, label=paste("phi & rho", labs), group=NULL), size = 4, color = "grey50", data=dat, parse = T)
 p.CP
-ggsave("R/plot_CP_phirho.png", width = 200, height = 120, units = "mm")
+ggsave("R2/plot_CP_phirho.png", width = 200, height = 120, units = "mm")
 
 
 p.CIL <- ggplot(rst5.phrh[rst5.phrh$measure == "CIL",], aes(theta, value, group = CI.method)) + 
@@ -218,7 +220,7 @@ p.CIL <- ggplot(rst5.phrh[rst5.phrh$measure == "CIL",], aes(theta, value, group 
   theme_bw()  +
   theme(legend.position="bottom")
 p.CIL
-ggsave("R/plot_CIL_phirho.png", width = 200, height = 120, units = "mm")
+ggsave("R2/plot_CIL_phirho.png", width = 200, height = 120, units = "mm")
 
 
 
@@ -258,7 +260,7 @@ p.CIL.n <- ggplot(rst5.n[rst5.n$measure == "CIL",], aes(theta, value, group = CI
   theme(legend.position="bottom",strip.text.x = element_blank())
 p.CIL.n
 
-png("R/plot_n.png", width = 200, height = 200, res=1200, units = "mm")
+png("R2/plot_n.png", width = 200, height = 200, res=1200, units = "mm")
 grid.arrange(p.CP.n, p.CIL.n, nrow=2)
 dev.off()
 
@@ -281,7 +283,7 @@ p.CP.n.PMMLR <- ggplot(rst5.n[rst5.n$measure == "CP"&(rst5.n$MI == "PMM"|rst5.n$
   theme(legend.position="bottom")
 # geom_text(aes(theta, CP, label=paste("phi & rho", labs), group=NULL), size = 4, color = "grey50", data=dat, parse = T)
 p.CP.n.PMMLR
-ggsave("R/plot_CP_n_PMMLR.png", width = 200, height = 100, units = "mm")
+ggsave("R2/plot_CP_n_PMMLR.png", width = 200, height = 100, units = "mm")
 
 
 p.CIL.n.PMMLR <- ggplot(rst5.n[rst5.n$measure == "CIL"&(rst5.n$MI == "PMM"|rst5.n$MI == "LR"),], aes(theta, value, group = MI)) + 
@@ -300,5 +302,5 @@ p.CIL.n.PMMLR <- ggplot(rst5.n[rst5.n$measure == "CIL"&(rst5.n$MI == "PMM"|rst5.
   theme_bw()  +
   theme(legend.position="bottom")
 p.CIL.n.PMMLR
-ggsave("R/plot_CIL_n_PMMLR.png", width = 200, height = 100, units = "mm")
+ggsave("R2/plot_CIL_n_PMMLR.png", width = 200, height = 100, units = "mm")
 

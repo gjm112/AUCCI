@@ -97,9 +97,10 @@ head(pointest)
 pointest.avg <- aggregate(AUC.hat ~ AUC + MI, mean, data=pointest)
 
 AUC.data <- data.frame(AUC.hat=c(.8,.9,.95,.99), AUC=c(.8,.9,.95,.99))
+png("R/plot_bias.png", width = 200, height = 100, res=500, units = "mm")
 ggplot(pointest.avg[pointest.avg$MI %in% c("naive","complete", "PMM", "LR", "NORM"),], 
        aes(MI, AUC.hat, label = round(AUC.hat,2))) + 
-  geom_text(vjust = 0, nudge_y = 0.005, check_overlap = FALSE)+
+  geom_text(vjust = 0, nudge_y = c(0.005, rep(-0.015,3), 0.005), check_overlap = FALSE)+
   facet_grid(. ~ AUC, labeller=label_both) +
   geom_point(aes(colour = factor(MI), shape=factor(MI)), size = 3) + 
   geom_segment(aes(x=0, xend=5, y=AUC.hat, yend=AUC.hat, label=NULL), size=1,  
@@ -109,7 +110,8 @@ ggplot(pointest.avg[pointest.avg$MI %in% c("naive","complete", "PMM", "LR", "NOR
         panel.grid.major = element_line(colour = "grey80")) +
   scale_x_discrete(NULL) +
   ylab("Average AUC estimate")
-ggsave("R/plot_bias.png", width = 200, height = 100, units = "mm")
+dev.off()
+#ggsave("R/plot_bias.png", width = 200, height = 100, units = "mm")
 
 
 ## reshaping: wide to long
@@ -140,17 +142,15 @@ rst3.avg <- rst3.avg[,-grep("MI",names(rst3.avg))[-1]]
 rst3.avg[,1:2] <- rst3.avg[,c(2,1)]
 names(rst3.avg)[1:2] <- c("MI","CI.method")
 rst3.avg[,-(1:2)] <- round(rst3.avg[,-(1:2)],3)
+apply(rst3.avg[-1,-(1:2)],1,function(x) sprintf("%1.3f",x))
 
-# transpose : wide to long
-rst4.avg = t(as.matrix(rst3.avg))
-rst4.avg = cbind (rownames(rst4.avg),rownames(rst4.avg),rst4.avg)
-rst4.avg[,1] = c("MI","CI.method",rep("CP",4),rep("CP.MAE",4),rep("LNCP",4),rep("RNCP",4),rep("CIL",4))
-rst4.avg[,2] = c("MI","CI.method",rep(c(.8,.9,.95,.99),5))
-rownames(rst4.avg) <- NULL
 
-for (MI in MIset) {
-  print(xtable(rst4.avg[-1,c(1,2,which(rst4.avg[1,]==MI))], caption=MI), include.rownames = FALSE)
-}
+rst3.avg = rbind(c("AUC",NA,rep(c(0.8,0.9,0.95,0.99),5)), rst3.avg)
+rst3.avg = rst3.avg[c(1,7:11, 17:21, 22:26,12:16,2:6),]
+print(xtable(rst3.avg[,-(11:18)], caption="Performance of CI's for each imputation method"), include.rownames = FALSE)
+
+print(xtable(rst3.avg[,(11:18)], caption="Non-coverage probabiliities of CI's for each imputation method"), include.rownames = FALSE)
+
 
 
 ## rst5
@@ -196,10 +196,9 @@ p.CP <- ggplot(rst5.phrh[rst5.phrh$measure == "CP",], aes(theta, value, group = 
   scale_shape_discrete(name="CI methods") +
   scale_linetype_discrete(name="CI methods") +
   theme_bw()  +
-  theme(legend.position="bottom")
-  # geom_text(aes(theta, CP, label=paste("phi & rho", labs), group=NULL), size = 4, color = "grey50", data=dat, parse = T)
+  theme(legend.position="none", axis.title.x=element_blank(), axis.text.x=element_blank(),axis.ticks.x=element_blank())
 p.CP
-ggsave("R/plot_CP_phirho.png", width = 200, height = 120, units = "mm")
+#ggsave("R/plot_CP_phirho.png", width = 200, height = 120, units = "mm")
 
 
 p.CIL <- ggplot(rst5.phrh[rst5.phrh$measure == "CIL",], aes(theta, value, group = CI.method)) + 
@@ -216,10 +215,13 @@ p.CIL <- ggplot(rst5.phrh[rst5.phrh$measure == "CIL",], aes(theta, value, group 
   scale_shape_discrete(name="CI methods") +
   scale_linetype_discrete(name="CI methods") +
   theme_bw()  +
-  theme(legend.position="bottom")
+  theme(legend.position="bottom",strip.text.x = element_blank())
 p.CIL
-ggsave("R/plot_CIL_phirho.png", width = 200, height = 120, units = "mm")
+# ggsave("R/plot_CIL_phirho.png", width = 200, height = 120, units = "mm")
 
+png("R/plot_phirho.png", width = 200, height = 200, res=500, units = "mm")
+grid.arrange(p.CP, p.CIL, nrow=2)
+dev.off()
 
 
 p.CP.n <- ggplot(rst5.n[rst5.n$measure == "CP",], aes(theta, value, group = CI.method)) + 
@@ -258,7 +260,7 @@ p.CIL.n <- ggplot(rst5.n[rst5.n$measure == "CIL",], aes(theta, value, group = CI
   theme(legend.position="bottom",strip.text.x = element_blank())
 p.CIL.n
 
-png("R/plot_n.png", width = 200, height = 200, res=1200, units = "mm")
+png("R/plot_n.png", width = 200, height = 200, res=500, units = "mm")
 grid.arrange(p.CP.n, p.CIL.n, nrow=2)
 dev.off()
 
@@ -278,12 +280,11 @@ p.CP.n.PMMLR <- ggplot(rst5.n[rst5.n$measure == "CP"&(rst5.n$MI == "PMM"|rst5.n$
   scale_shape_discrete(name="MI techniques") +
   scale_linetype_discrete(name="MI techniques") +
   theme_bw()  +
-  theme(legend.position="bottom")
-# geom_text(aes(theta, CP, label=paste("phi & rho", labs), group=NULL), size = 4, color = "grey50", data=dat, parse = T)
+  theme(legend.position="none", axis.title.x=element_blank(), axis.text.x=element_blank(),axis.ticks.x=element_blank())
 p.CP.n.PMMLR
-ggsave("R/plot_CP_n_PMMLR.png", width = 200, height = 100, units = "mm")
+# ggsave("R/plot_CP_n_PMMLR.png", width = 200, height = 100, units = "mm")
 
-
+scale2d <- function(x) sprintf("%.2f", x)  # to align the y label widths between two figures
 p.CIL.n.PMMLR <- ggplot(rst5.n[rst5.n$measure == "CIL"&(rst5.n$MI == "PMM"|rst5.n$MI == "LR"),], aes(theta, value, group = MI)) + 
   geom_line(aes(color=MI, linetype=MI)) +
   # geom_abline(intercept = .95, slope = 0) +
@@ -293,12 +294,15 @@ p.CIL.n.PMMLR <- ggplot(rst5.n[rst5.n$measure == "CIL"&(rst5.n$MI == "PMM"|rst5.
   xlab("AUC") +
   ylab("CIL") +
   # ggtitle("The average coverage probability by each method") +
-  scale_y_continuous(minor_breaks = seq(0.5, 1, 0.05)) +
+  scale_y_continuous(minor_breaks = seq(0.5, 1, 0.05), labels=scale2d) +
   scale_color_discrete(name="MI techniques") +
   scale_shape_discrete(name="MI techniques") +
   scale_linetype_discrete(name="MI techniques") +
   theme_bw()  +
-  theme(legend.position="bottom")
+  theme(legend.position="bottom",strip.text.x = element_blank(),axis.text.y=)
 p.CIL.n.PMMLR
-ggsave("R/plot_CIL_n_PMMLR.png", width = 200, height = 100, units = "mm")
+
+png("R/plot_PMMLR.png", width = 200, height = 200, res=500, units = "mm")
+grid.arrange(p.CP.n.PMMLR, p.CIL.n.PMMLR, nrow=2)
+dev.off()
 
